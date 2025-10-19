@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { useState, useEffect, CSSProperties } from 'react';
-import { getToken, clearToken } from './utils/api';
+import { getToken, clearToken, api } from './utils/api';
 
 // Main app screens
 import Discover from './screens/Discover';
@@ -10,6 +10,11 @@ import TradeBuilder from './screens/TradeBuilder';
 import Messages from './screens/Messages';
 import Profile from './screens/Profile';
 import Settings from './screens/Settings';
+import GuardianDashboard from './screens/GuardianDashboard';
+import LostAndFound from './screens/LostAndFound';
+import CreateBounty from './screens/CreateBounty';
+import BountyDetail from './screens/BountyDetail';
+import MyBounties from './screens/MyBounties';
 
 // Auth screens
 import SignIn from './screens/SignIn';
@@ -63,10 +68,35 @@ function ProtectedApp({
   isAuthenticated: boolean;
   setIsAuthenticated: (auth: boolean) => void;
 }) {
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadUser() {
+      try {
+        const res = await api.auth.me();
+        if (res.ok && res.user) {
+          setCurrentUser(res.user);
+        }
+      } catch (error) {
+        console.error('Failed to load user:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadUser();
+  }, []);
+
   // If not authenticated, redirect to signin
   if (!isAuthenticated) {
     return <Navigate to="/signin" replace />;
   }
+
+  if (loading) {
+    return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>Loading...</div>;
+  }
+
+  const isGuardian = currentUser?.isGuardian === true;
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
@@ -82,13 +112,14 @@ function ProtectedApp({
       {drawerOpen && (
         <AppDrawer 
           isOpen={drawerOpen} 
-          onClose={() => setDrawerOpen(false)} 
+          onClose={() => setDrawerOpen(false)}
+          isGuardian={isGuardian}
         />
       )}
 
       <main>
         <Routes>
-          <Route path="/" element={<Navigate to="/discover" replace />} />
+          <Route path="/" element={<Navigate to={isGuardian ? "/guardian" : "/discover"} replace />} />
           <Route path="/discover" element={<Discover />} />
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/add" element={<AddToInventory />} />
@@ -96,6 +127,11 @@ function ProtectedApp({
           <Route path="/messages/:conversationId?" element={<Messages />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/guardian" element={<GuardianDashboard />} />
+          <Route path="/lost-and-found" element={<LostAndFound />} />
+          <Route path="/my-bounties" element={<MyBounties />} />
+          <Route path="/bounty/:id" element={<BountyDetail />} />
+          <Route path="/create-bounty" element={<CreateBounty />} />
         </Routes>
       </main>
     </div>
@@ -245,7 +281,7 @@ function AppHeader({ onMenuClick, onSignOut }: { onMenuClick: () => void; onSign
 }
 
 // Drawer Component - Grouped & colorful
-function AppDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+function AppDrawer({ isOpen, onClose, isGuardian }: { isOpen: boolean; onClose: () => void; isGuardian?: boolean }) {
   const location = useLocation();
 
   const backdropStyles: CSSProperties = {
@@ -291,23 +327,35 @@ function AppDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }
     fontWeight: 'var(--font-medium)',
   };
 
-  const menuItems = [
+  // Guardian accounts only see guardian-specific pages
+  const guardianMenuItems = [
+    { to: '/guardian', icon: '👨‍👩‍👧', label: 'Guardian Dashboard', color: '#8b5cf6' },
+    { to: '/lost-and-found', icon: '🔍', label: 'Lost & Found Bounty', color: '#f59e0b' },
+  ];
+
+  // Regular user menu items
+  const regularMenuItems = [
     { to: '/discover', icon: '🔍', label: 'Discover', color: 'var(--color-accent-blue)' },
     { to: '/inventory', icon: '📦', label: 'My Toy Box', color: 'var(--color-accent-purple)' },
     { to: '/add', icon: '➕', label: 'Add Item', color: 'var(--color-accent-yellow)' },
     { to: '/trades', icon: '🔄', label: 'Trade Room', color: 'var(--color-brand)' },
     { to: '/messages', icon: '💬', label: 'Messages', color: 'var(--color-accent-coral)' },
+    { to: '/lost-and-found', icon: '🔍', label: 'Lost & Found Bounty', color: 'var(--color-accent-yellow)' },
     { to: '/profile', icon: '👤', label: 'Profile & XP', color: 'var(--color-accent-purple)' },
     { to: '/settings', icon: '⚙️', label: 'Settings', color: 'var(--color-gray-500)' },
   ];
+
+  const menuItems = isGuardian ? guardianMenuItems : regularMenuItems;
 
   return (
     <>
       <div style={backdropStyles} onClick={onClose} />
       <aside style={drawerStyles}>
         <div style={headerStyles}>
-          <h2 style={titleStyles}>Menu</h2>
-          <p style={subtitleStyles}>What do you want to do today?</p>
+          <h2 style={titleStyles}>{isGuardian ? 'Guardian Menu' : 'Menu'}</h2>
+          <p style={subtitleStyles}>
+            {isGuardian ? 'Monitor your child\'s safety' : 'What do you want to do today?'}
+          </p>
         </div>
         <nav>
           <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>

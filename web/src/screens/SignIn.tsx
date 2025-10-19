@@ -221,8 +221,11 @@ export default function SignIn() {
           <div style={{marginBottom: 'var(--space-2)'}}>
             <strong>Jack:</strong> jack@swappy.demo / password123
           </div>
-          <div>
+          <div style={{marginBottom: 'var(--space-2)'}}>
             <strong>Anderson:</strong> anderson@swappy.demo / password123
+          </div>
+          <div style={{borderTop: '1px solid var(--color-border)', paddingTop: 'var(--space-2)', marginTop: 'var(--space-2)'}}>
+            <strong>👨‍👩‍👧 Guardian (Parent):</strong> mike.anderson@example.com / guardian123
           </div>
         </div>
         

@@ -68,6 +68,26 @@ const DEMO_USERS = {
       xpToNextLevel: 1000,
       hasGuardian: true,
       createdAt: '2025-01-10T14:30:00.000Z'
+    },
+    'mike.anderson@example.com': {
+      id: 'guardian_anderson',
+      email: 'mike.anderson@example.com',
+      passwordHash: '', // Will be set to bcrypt('guardian123')
+      age: 42,
+      guardianName: 'Self',
+      guardianEmail: 'mike.anderson@example.com',
+      isGuardian: true,
+      childUserId: 'u_demo_2',
+      childUsername: 'anderson',
+      
+      // Profile data
+      username: 'Michael (Guardian)',
+      avatar: '👨‍👩‍👧',
+      level: 1,
+      xp: 0,
+      xpToNextLevel: 100,
+      hasGuardian: false,
+      createdAt: '2025-01-10T14:30:00.000Z'
     }
   },
   byId: {}
@@ -76,12 +96,21 @@ const DEMO_USERS = {
 // Initialize demo users with hashed passwords
 async function initializeDemoUsers() {
   const hash = await bcrypt.hash('password123', 12);
+  const guardianHash = await bcrypt.hash('guardian123', 12);
+  
   DEMO_USERS.byEmail['jack@swappy.demo'].passwordHash = hash;
   DEMO_USERS.byEmail['anderson@swappy.demo'].passwordHash = hash;
+  DEMO_USERS.byEmail['mike.anderson@example.com'].passwordHash = guardianHash;
   
   // Set up byId index
   DEMO_USERS.byId['u_demo_1'] = DEMO_USERS.byEmail['jack@swappy.demo'];
   DEMO_USERS.byId['u_demo_2'] = DEMO_USERS.byEmail['anderson@swappy.demo'];
+  DEMO_USERS.byId['guardian_anderson'] = DEMO_USERS.byEmail['mike.anderson@example.com'];
+  
+  console.log('[DB] Demo users initialized:');
+  console.log('   jack@swappy.demo / password123');
+  console.log('   anderson@swappy.demo / password123');
+  console.log('   mike.anderson@example.com / guardian123 (Guardian Account)');
 }
 
 // ensure files exist
@@ -98,9 +127,6 @@ function ensureFile(file, initialJson) {
   ensureFile(usersFile, DEMO_USERS);
   ensureFile(resetsFile, { tokens: {} });
   ensureFile(inventoryFile, { items: [] });
-  console.log('📚 Demo database initialized with 2 users:');
-  console.log('   jack@swappy.demo / password123');
-  console.log('   anderson@swappy.demo / password123');
 })();
 
 async function readJson(file) {

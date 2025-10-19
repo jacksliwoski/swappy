@@ -7,6 +7,7 @@ import { valuation } from './features/valuation';
 import { unevenScore } from './features/fairness';
 import { moderateStreamSSE } from './features/moderationStream';
 import { getSafeMeetupSuggestions } from './features/meetupSuggestions';
+import { verifyBountyClaimAI, analyzeHuntClues, generateClues } from './features/bountyVerification';
 
 dotenv.config();
 
@@ -161,6 +162,11 @@ app.post('/ai/meetup-suggestions', async (req, res) => {
   }
 });
 
+// AI Bounty Verification endpoints
+app.post('/ai/verify-claim', verifyBountyClaimAI);
+app.post('/ai/analyze-clues', analyzeHuntClues);
+app.post('/ai/generate-clues', generateClues);
+
 // Start server
 if (!process.env.GEMINI_API_KEY) {
   console.error('❌ ERROR: GEMINI_API_KEY is not set in .env file');
@@ -178,4 +184,7 @@ app.listen(PORT, () => {
   console.log(`   POST /ai/uneven-score`);
   console.log(`   GET  /ai/moderate/stream?msg=...`);
   console.log(`   POST /ai/meetup-suggestions`);
+  console.log(`   POST /ai/verify-claim`);
+  console.log(`   POST /ai/analyze-clues`);
+  console.log(`   POST /ai/generate-clues`);
 });

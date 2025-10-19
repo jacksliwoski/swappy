@@ -30,7 +30,12 @@
       "Bash(taskkill /PID 24356 /F)",
       "Bash(taskkill //PID 24356 //F)",
       "Bash(dir \"C:\\Users\\User\\Downloads\\swappy\" /S /B)",
-      "Bash(find . -maxdepth 3 -type f ( -name \"*.js\" -o -name \"*.ts\" ) ! -path \"*/node_modules/*\")"
+      "Bash(find . -maxdepth 3 -type f ( -name \"*.js\" -o -name \"*.ts\" ) ! -path \"*/node_modules/*\")",
+      "Bash(taskkill /PID 17780 /F)",
+      "Bash(npm start)",
+      "Bash(taskkill //PID 17780 //F)",
+      "Bash(timeout /t 2 /nobreak)",
+      "Bash(findstr :5173)"
     ],
     "deny": [],
     "ask": []

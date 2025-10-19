@@ -236,6 +236,25 @@ export const api = {
     },
   },
 
+  guardian: {
+    getAlerts(guardianId: string) {
+      return withAuth((headers) => {
+        return fetchJSON(`${DATA_BASE_URL}/api/guardian/${guardianId}/alerts`, {
+          method: 'GET',
+          headers,
+        });
+      });
+    },
+    acknowledgeAlert(alertId: string) {
+      return withAuth((headers) => {
+        return fetchJSON(`${DATA_BASE_URL}/api/guardian/alerts/${alertId}/acknowledge`, {
+          method: 'POST',
+          headers,
+        });
+      });
+    },
+  },
+
   trades: {
     getDraft(userId: string) {
       // Mock for now - in real app would fetch from localStorage or backend
@@ -327,6 +346,97 @@ export const api = {
           }),
         })
       );
+    },
+  },
+
+  bounties: {
+    list(filters: any = {}) {
+      return withAuth((headers) => {
+        const params = new URLSearchParams();
+        if (filters.bountyType) params.append('bountyType', filters.bountyType);
+        if (filters.type) params.append('type', filters.type);
+        if (filters.category) params.append('category', filters.category);
+        if (filters.location) params.append('location', filters.location);
+        if (filters.status) params.append('status', filters.status);
+        if (filters.sort) params.append('sort', filters.sort);
+        if (filters.search) params.append('search', filters.search);
+        
+        const queryString = params.toString();
+        const url = `${DATA_BASE_URL}/api/bounties${queryString ? `?${queryString}` : ''}`;
+        
+        return fetchJSON(url, {
+          method: 'GET',
+          headers,
+        });
+      });
+    },
+
+    get(bountyId: string) {
+      return withAuth((headers) => {
+        return fetchJSON(`${DATA_BASE_URL}/api/bounties/${bountyId}`, {
+          method: 'GET',
+          headers,
+        });
+      });
+    },
+
+    create(bountyData: any) {
+      return withAuth((headers) => {
+        return fetchJSON(`${DATA_BASE_URL}/api/bounties`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(bountyData),
+        });
+      });
+    },
+
+    claim(bountyId: string, claimData: any) {
+      return withAuth((headers) => {
+        return fetchJSON(`${DATA_BASE_URL}/api/bounties/${bountyId}/claim`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(claimData),
+        });
+      });
+    },
+
+    verify(bountyId: string, verificationData: any) {
+      return withAuth((headers) => {
+        return fetchJSON(`${DATA_BASE_URL}/api/bounties/${bountyId}/verify`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(verificationData),
+        });
+      });
+    },
+
+    getMyBounties() {
+      return withAuth((headers) => {
+        return fetchJSON(`${DATA_BASE_URL}/api/bounties/my`, {
+          method: 'GET',
+          headers,
+        });
+      });
+    },
+  },
+
+  treasureHunts: {
+    live() {
+      return withAuth((headers) => {
+        return fetchJSON(`${DATA_BASE_URL}/api/bounties?bountyType=treasure_hunt&status=active`, {
+          method: 'GET',
+          headers,
+        });
+      });
+    },
+
+    join(huntId: string) {
+      return withAuth((headers) => {
+        return fetchJSON(`${DATA_BASE_URL}/api/bounties/${huntId}/join`, {
+          method: 'POST',
+          headers,
+        });
+      });
     },
   },
 };

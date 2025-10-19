@@ -28,6 +28,8 @@ app.use('/api/users', require('./routes/users'));
 app.use('/api/trades', require('./routes/trades'));
 app.use('/api/messages', require('./routes/messages'));
 app.use('/api/discover', require('./routes/discover'));
+app.use('/api/guardian', require('./routes/guardian'));
+app.use('/api/bounties', require('./routes/bounties'));
 
 app.use((_req, res) => res.status(404).json({ ok: false, error: 'not_found' }));
 
