@@ -205,16 +205,62 @@ export const api = {
 
   trades: {
     getDraft(userId: string) {
-      // Mock for now
+      // Mock for now - in real app would fetch from localStorage or backend
       return Promise.resolve(null);
     },
     saveDraft(draft: any) {
-      // Mock for now
+      // Mock for now - in real app would save to localStorage or backend
       return Promise.resolve({ ok: true });
     },
     propose(trade: any) {
-      // Mock for now
-      return Promise.resolve({ ok: true });
+      return withAuth((headers) =>
+        fetchJSON(`${DATA_API}/api/trades/propose`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(trade),
+        })
+      );
+    },
+    accept(tradeId: string) {
+      return withAuth((headers) =>
+        fetchJSON(`${DATA_API}/api/trades/${tradeId}/accept`, {
+          method: 'PUT',
+          headers,
+        })
+      );
+    },
+    decline(tradeId: string) {
+      return withAuth((headers) =>
+        fetchJSON(`${DATA_API}/api/trades/${tradeId}/decline`, {
+          method: 'PUT',
+          headers,
+        })
+      );
+    },
+    counter(tradeId: string, counterOffer: any) {
+      return withAuth((headers) =>
+        fetchJSON(`${DATA_API}/api/trades/${tradeId}/counter`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(counterOffer),
+        })
+      );
+    },
+    getAll(userId: string) {
+      return withAuth((headers) =>
+        fetchJSON(`${DATA_API}/api/trades?userId=${userId}`, {
+          method: 'GET',
+          headers,
+        })
+      );
+    },
+    get(tradeId: string) {
+      return withAuth((headers) =>
+        fetchJSON(`${DATA_API}/api/trades/${tradeId}`, {
+          method: 'GET',
+          headers,
+        })
+      );
     },
   },
 

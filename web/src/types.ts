@@ -107,14 +107,22 @@ export type Trade = {
   toUserId: string;
   fromUser: User;
   toUser: User;
-  offerA: TradeOffer; // from user's offer
-  offerB: TradeOffer; // to user's offer
-  status: 'draft' | 'proposed' | 'accepted' | 'declined' | 'completed' | 'canceled';
+  offerA: TradeOffer; // from user's offer (what they're giving)
+  offerB: TradeOffer; // to user's offer (what they're requesting)
+  status: 'draft' | 'proposed' | 'accepted' | 'declined' | 'completed' | 'canceled' | 'countered';
   fairness: FairnessResponse;
   rating?: TradeRating;
   proposedAt?: string;
+  respondedAt?: string;
   completedAt?: string;
   xpAwarded?: number;
+  counterOfferTo?: string; // ID of the original offer if this is a counter
+  message?: string; // Optional message with the offer
+};
+
+export type TradeOfferMessage = {
+  type: 'trade_offer';
+  trade: Trade;
 };
 
 // ========== Messages ==========
@@ -123,10 +131,11 @@ export type Message = {
   conversationId: string;
   fromUserId: string;
   toUserId: string;
-  text: string;
+  text?: string;
   moderation?: ModerationResult;
   sentAt: string;
   read: boolean;
+  tradeOffer?: TradeOfferMessage; // If this is a trade offer message
 };
 
 export type Conversation = {

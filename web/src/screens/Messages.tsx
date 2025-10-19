@@ -1,16 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { ai, api } from '../utils/api';
 import UserAvatar from '../components/cards/UserAvatar';
 import SafetyBanner from '../components/ui/SafetyBanner';
 import Button from '../components/ui/Button';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import MeetupAssistant, { MeetupDetails } from '../components/meetup/MeetupAssistant';
+import TradeOfferCard from '../components/trade/TradeOfferCard';
 import { detectMeetupIntent, detectUnsafeBehavior } from '../utils/meetupDetection';
 import type { Conversation, Message, User, ModerationResult } from '../types';
 
 export default function Messages() {
   const { conversationId: paramConversationId } = useParams();
+  const navigate = useNavigate();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConvId, setSelectedConvId] = useState<string | null>(paramConversationId || null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -188,6 +190,46 @@ export default function Messages() {
     setShowPlanMeetupButton(true);
   }
 
+  async function handleAcceptTrade(tradeId: string) {
+    if (!confirm('Accept this trade offer? This will mark the trade as accepted and you can arrange a meetup.')) {
+      return;
+    }
+
+    try {
+      await api.trades.accept(tradeId);
+      // Reload messages to show updated status
+      if (selectedConvId) {
+        loadMessages(selectedConvId);
+      }
+      alert('Trade accepted! You can now plan your meetup.');
+    } catch (error) {
+      console.error('Failed to accept trade:', error);
+      alert('Failed to accept trade. Please try again.');
+    }
+  }
+
+  async function handleDeclineTrade(tradeId: string) {
+    if (!confirm('Decline this trade offer?')) {
+      return;
+    }
+
+    try {
+      await api.trades.decline(tradeId);
+      // Reload messages to show updated status
+      if (selectedConvId) {
+        loadMessages(selectedConvId);
+      }
+    } catch (error) {
+      console.error('Failed to decline trade:', error);
+      alert('Failed to decline trade. Please try again.');
+    }
+  }
+
+  function handleCounterTrade(tradeId: string) {
+    // Navigate to trade builder with the original trade to counter
+    navigate(`/trades?counter=${tradeId}`);
+  }
+
   if (loading) {
     return (
       <div style={{ padding: '2rem', display: 'flex', justifyContent: 'center' }}>
@@ -311,7 +353,24 @@ export default function Messages() {
               gap: 'var(--space-3)',
             }}>
               {messages.map(msg => {
-                const isMe = msg.fromUserId === 'user-1';
+                const isMe = msg.fromUserId === currentUser?.id;
+                
+                // Render trade offer message
+                if (msg.tradeOffer) {
+                  return (
+                    <div key={msg.id} style={{ width: '100%' }}>
+                      <TradeOfferCard
+                        trade={msg.tradeOffer.trade}
+                        isReceiver={!isMe}
+                        onAccept={() => handleAcceptTrade(msg.tradeOffer!.trade.id)}
+                        onDecline={() => handleDeclineTrade(msg.tradeOffer!.trade.id)}
+                        onCounter={() => handleCounterTrade(msg.tradeOffer!.trade.id)}
+                      />
+                    </div>
+                  );
+                }
+                
+                // Render normal text message
                 return (
                   <div
                     key={msg.id}

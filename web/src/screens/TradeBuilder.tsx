@@ -30,6 +30,9 @@ export default function TradeBuilder() {
   const [theirInventory, setTheirInventory] = useState<InventoryItem[]>([]);
   const [myUser, setMyUser] = useState<User | null>(null);
   const [theirUser, setTheirUser] = useState<User | null>(null);
+  const [availableUsers, setAvailableUsers] = useState<User[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Offers
   const [myOffer, setMyOffer] = useState<string[]>([]);
@@ -92,33 +95,93 @@ export default function TradeBuilder() {
   async function loadData(userId: string) {
     setLoading(true);
     try {
-      const [myData, discoverData, userData] = await Promise.all([
+      const [myData, userData] = await Promise.all([
         api.users.getInventory(userId),
-        api.discover.browse({}),
         api.users.get(userId),
       ]);
 
       setMyInventory(myData.items || []);
-      setMyUser(userData);
+      const userObj = userData.user || userData;
+      setMyUser(userObj);
 
-      // Mock their items and user (in real app, this would be specific user)
-      setTheirInventory((discoverData.items || []).slice(0, 8));
-      setTheirUser({
-        id: 'user-2',
-        username: 'TradingBuddy',
-        avatar: '🎮',
-        level: 3,
-        xp: 250,
-        xpToNextLevel: 500,
-        hasGuardian: true,
-        createdAt: new Date().toISOString(),
-      });
+      // Load mock available users (in real app, fetch from /api/users)
+      const mockUsers: User[] = [
+        {
+          id: 'u_demo_2',
+          username: 'Anderson',
+          avatar: '🎮',
+          level: 5,
+          xp: 820,
+          xpToNextLevel: 1000,
+          hasGuardian: true,
+          createdAt: '2025-01-10T14:30:00.000Z',
+        },
+        {
+          id: 'user-3',
+          username: 'TradingBuddy',
+          avatar: '🚀',
+          level: 3,
+          xp: 250,
+          xpToNextLevel: 500,
+          hasGuardian: true,
+          createdAt: new Date().toISOString(),
+        },
+        {
+          id: 'user-4',
+          username: 'CoolTrader',
+          avatar: '🎨',
+          level: 4,
+          xp: 450,
+          xpToNextLevel: 700,
+          hasGuardian: true,
+          createdAt: new Date().toISOString(),
+        },
+      ];
+      
+      // Filter out current user
+      setAvailableUsers(mockUsers.filter(u => u.id !== userId));
+      
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
       setLoading(false);
     }
   }
+
+  async function loadUserInventory(userId: string) {
+    try {
+      const userData = await api.users.get(userId);
+      const inventoryData = await api.users.getInventory(userId);
+      
+      const userObj = userData.user || userData;
+      setTheirUser(userObj);
+      setTheirInventory(inventoryData.items || []);
+      
+      // Clear offers when switching users
+      setTheirOffer([]);
+      clearReadiness();
+    } catch (error) {
+      console.error('Failed to load user inventory:', error);
+      // Set mock data
+      setTheirInventory([]);
+      setTheirUser({
+        id: userId,
+        username: 'User',
+        avatar: '😊',
+        level: 1,
+        xp: 0,
+        xpToNextLevel: 50,
+        hasGuardian: true,
+        createdAt: new Date().toISOString(),
+      });
+    }
+  }
+
+  useEffect(() => {
+    if (selectedUserId) {
+      loadUserInventory(selectedUserId);
+    }
+  }, [selectedUserId]);
 
   async function calculateFairness() {
     if (myOffer.length === 0 || theirOffer.length === 0) {
@@ -288,10 +351,21 @@ export default function TradeBuilder() {
   async function handleConfirmTrade() {
     if (!fairness || !myUser || !theirUser) return;
 
+    // Show confirmation dialog
+    const message = prompt(
+      'Add a message with your trade offer (optional):',
+      `Hi! I'd like to trade with you.`
+    );
+    
+    // User canceled
+    if (message === null) return;
+
     try {
-      await api.trades.propose({
-        fromUserId: 'user-1',
-        toUserId: 'user-2',
+      const tradeOffer = {
+        fromUserId: myUser.id,
+        toUserId: theirUser.id,
+        fromUser: myUser,
+        toUser: theirUser,
         offerA: {
           items: myOffer.map(id => myInventory.find(i => i.id === id)).filter(Boolean),
           totalValue: fairness.A,
@@ -301,15 +375,20 @@ export default function TradeBuilder() {
           totalValue: fairness.B,
         },
         fairness,
-      });
+        message: message || undefined,
+        status: 'proposed' as const,
+      };
 
-      addEvent('confirmed', 'Trade confirmed!');
+      await api.trades.propose(tradeOffer);
+
+      addEvent('confirmed', 'Trade offer sent!');
       setShowConfetti(true);
       setTimeout(() => {
         navigate('/messages');
       }, 2000);
     } catch (error) {
-      console.error('Failed to propose trade:', error);
+      console.error('Failed to send trade offer:', error);
+      alert('Failed to send trade offer. Please try again.');
     }
   }
 
@@ -367,7 +446,7 @@ export default function TradeBuilder() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [myReady, canConfirm, calculating, myOffer.length, theirOffer.length]);
 
-  if (loading || !myUser || !theirUser) {
+  if (loading || !myUser) {
     return (
       <div style={{ padding: '2rem', display: 'flex', justifyContent: 'center' }}>
         <LoadingSpinner />
@@ -381,12 +460,141 @@ export default function TradeBuilder() {
 
       <h1 style={{
         fontSize: 'var(--text-3xl)',
-        marginBottom: 'var(--space-2)',
+        marginBottom: 'var(--space-4)',
         textAlign: 'center',
         fontFamily: 'var(--font-family-display)',
       }}>
         🔄 Trading Room
       </h1>
+
+      {/* User Selector */}
+      <div style={{
+        maxWidth: '600px',
+        margin: '0 auto var(--space-6)',
+        background: 'var(--color-surface)',
+        padding: 'var(--space-4)',
+        borderRadius: 'var(--radius-lg)',
+        border: '2px solid var(--color-border)',
+        boxShadow: 'var(--shadow-s1)',
+      }}>
+        <label style={{
+          display: 'block',
+          fontSize: 'var(--text-base)',
+          fontWeight: 'var(--font-semibold)',
+          marginBottom: 'var(--space-3)',
+          color: 'var(--color-text-1)',
+        }}>
+          👤 Select who you want to trade with:
+        </label>
+        
+        {/* Search Input */}
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Search by username..."
+          style={{
+            width: '100%',
+            padding: 'var(--space-3)',
+            fontSize: 'var(--text-base)',
+            border: '2px solid var(--color-border)',
+            borderRadius: 'var(--radius-md)',
+            marginBottom: 'var(--space-3)',
+          }}
+        />
+
+        {/* User List */}
+        <div style={{
+          display: 'grid',
+          gap: 'var(--space-2)',
+          maxHeight: '200px',
+          overflowY: 'auto',
+        }}>
+          {availableUsers
+            .filter(user => 
+              user.username.toLowerCase().includes(searchTerm.toLowerCase())
+            )
+            .map(user => (
+              <div
+                key={user.id}
+                onClick={() => setSelectedUserId(user.id)}
+                style={{
+                  padding: 'var(--space-3)',
+                  background: selectedUserId === user.id ? 'var(--color-brand-tint)' : 'var(--color-gray-100)',
+                  border: selectedUserId === user.id ? '2px solid var(--color-brand)' : '2px solid transparent',
+                  borderRadius: 'var(--radius-md)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-3)',
+                  transition: 'all var(--transition-fast)',
+                }}
+                onMouseEnter={(e) => {
+                  if (selectedUserId !== user.id) {
+                    e.currentTarget.style.background = 'var(--color-gray-200)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (selectedUserId !== user.id) {
+                    e.currentTarget.style.background = 'var(--color-gray-100)';
+                  }
+                }}
+              >
+                <div style={{
+                  fontSize: '32px',
+                  width: '40px',
+                  height: '40px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'var(--color-brand-tint)',
+                  borderRadius: 'var(--radius-full)',
+                  border: '2px solid var(--color-brand)',
+                }}>
+                  {user.avatar}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{
+                    fontWeight: 'var(--font-bold)',
+                    fontSize: 'var(--text-base)',
+                    color: 'var(--color-text-1)',
+                  }}>
+                    {user.username}
+                  </div>
+                  <div style={{
+                    fontSize: 'var(--text-small)',
+                    color: 'var(--color-text-2)',
+                  }}>
+                    Level {user.level} • {user.xp} XP
+                  </div>
+                </div>
+                {selectedUserId === user.id && (
+                  <div style={{
+                    fontSize: '20px',
+                    color: 'var(--color-brand)',
+                  }}>
+                    ✓
+                  </div>
+                )}
+              </div>
+            ))}
+        </div>
+
+        {selectedUserId && theirUser && (
+          <div style={{
+            marginTop: 'var(--space-3)',
+            padding: 'var(--space-3)',
+            background: 'var(--color-rating-great-bg)',
+            borderRadius: 'var(--radius-md)',
+            color: 'var(--color-rating-great-text)',
+            fontSize: 'var(--text-small)',
+            fontWeight: 'var(--font-semibold)',
+            textAlign: 'center',
+          }}>
+            ✓ Trading with {theirUser.username}
+          </div>
+        )}
+      </div>
 
       {/* Keyboard shortcuts hint */}
       <div style={{
@@ -395,7 +603,7 @@ export default function TradeBuilder() {
         color: 'var(--color-gray-600)',
         marginBottom: 'var(--space-6)',
       }}>
-        ⌨️ <strong>Keyboard:</strong> Click or Enter to add items • Delete to remove • Space to toggle ready • Enter to confirm
+        ⌨️ <strong>Keyboard:</strong> Click or Enter to add items • Delete to remove • Space to toggle ready • Enter to send offer
       </div>
 
       {/* Offer Changed Notice */}
@@ -421,6 +629,33 @@ export default function TradeBuilder() {
         </div>
       )}
 
+      {/* No user selected or user data loading */}
+      {!selectedUserId && (
+        <div style={{
+          textAlign: 'center',
+          padding: 'var(--space-8)',
+          color: 'var(--color-text-2)',
+          fontSize: 'var(--text-lg)',
+        }}>
+          👆 Please select a user above to start trading
+        </div>
+      )}
+
+      {/* Loading selected user's data */}
+      {selectedUserId && !theirUser && (
+        <div style={{
+          textAlign: 'center',
+          padding: 'var(--space-8)',
+          color: 'var(--color-text-2)',
+        }}>
+          <LoadingSpinner />
+          <p style={{ marginTop: 'var(--space-4)' }}>Loading inventory...</p>
+        </div>
+      )}
+
+      {/* Trading UI - only show when user is selected and loaded */}
+      {selectedUserId && theirUser && (
+        <>
       {/* Desktop Layout */}
       <div className="desktop-layout" style={{ display: 'grid', gridTemplateColumns: '1fr 480px 1fr', gap: 'var(--space-6)' }}>
         {/* Left: My Inventory */}
@@ -703,7 +938,7 @@ export default function TradeBuilder() {
                   fontWeight: 'var(--font-bold)',
                 }}
               >
-                {calculating ? <LoadingSpinner /> : '🎉 Confirm Trade'}
+                {calculating ? <LoadingSpinner /> : '📤 Send Trade Offer'}
               </Button>
             </div>
           )}
@@ -924,7 +1159,7 @@ export default function TradeBuilder() {
                 onClick={handleConfirmTrade}
                 style={{ flex: 2, background: 'var(--color-success)', fontWeight: 'var(--font-bold)' }}
               >
-                🎉 Confirm
+                📤 Send Offer
               </Button>
             )}
           </div>
@@ -1003,6 +1238,8 @@ export default function TradeBuilder() {
           opacity: 0.7;
         }
       `}</style>
+        </>
+      )}
     </div>
   );
 }
