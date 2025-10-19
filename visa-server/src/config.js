@@ -20,3 +20,22 @@ const config = {
 };
 
 module.exports = { config };
+
+// src/config.js
+require('dotenv').config();
+
+const config = {
+  port: Number(process.env.PORT || 7010),
+  mock: String(process.env.MOCK || 'false').toLowerCase() === 'true',
+  corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  jwtSecret: process.env.JWT_SECRET || 'dev-secret-change-me',
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
+  resetTokenExpiresMin: Number(process.env.RESET_TOKEN_EXPIRES_MIN || 30),
+  appUrl: process.env.APP_URL || 'http://localhost:5173',
+
+  // mailer: write emails to files, no SMTP needed
+  outboxDir: process.env.OUTBOX_DIR || 'data/outbox'
+};
+
+module.exports = { config };
+
