@@ -15,6 +15,20 @@ export default function Profile() {
   const [quests, setQuests] = useState<Quest[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasGuardian, setHasGuardian] = useState(true);
+  const [preferencesExpanded, setPreferencesExpanded] = useState(false);
+  const [editingPreferences, setEditingPreferences] = useState(false);
+  const [preferences, setPreferences] = useState({
+    location: '',
+    timeWindow: '',
+    travelMode: 'driving',
+    maxMinutes: 20,
+    indoorPreferred: false,
+    wheelchairAccess: false,
+    parkingNeeded: false,
+    categoryInterests: [] as string[],
+    guardianName: '',
+    guardianEmail: '',
+  });
 
   useEffect(() => {
     // Get current user first, then load profile
@@ -36,10 +50,27 @@ export default function Profile() {
         api.users.getBadges?.(userId) || Promise.resolve({ badges: [] }),
         api.users.getQuests?.(userId) || Promise.resolve({ quests: [] }),
       ]);
-      setUser(userData.user);
+      
+      // API returns user directly, not wrapped
+      const userObj = userData.user || userData;
+      setUser(userObj);
       setBadges(badgesData.badges || []);
       setQuests(questsData.quests || []);
-      setHasGuardian(userData.user?.hasGuardian || false);
+      setHasGuardian(userObj?.hasGuardian || false);
+      
+      // Load preferences from user data
+      setPreferences({
+        location: userObj?.location || '',
+        timeWindow: userObj?.timeWindow || '',
+        travelMode: userObj?.travelMode || 'driving',
+        maxMinutes: userObj?.maxMinutes || 20,
+        indoorPreferred: userObj?.indoorPreferred || false,
+        wheelchairAccess: userObj?.wheelchairAccess || false,
+        parkingNeeded: userObj?.parkingNeeded || false,
+        categoryInterests: userObj?.categoryInterests || [],
+        guardianName: userObj?.guardianName || '',
+        guardianEmail: userObj?.guardianEmail || '',
+      });
     } catch (error) {
       console.error('Failed to load profile:', error);
       // Set mock data for demo
@@ -53,6 +84,23 @@ export default function Profile() {
         hasGuardian: true,
         createdAt: new Date().toISOString(),
       });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSavePreferences() {
+    if (!user) return;
+    
+    setLoading(true);
+    try {
+      await api.users.updateProfile(user.id, preferences);
+      setEditingPreferences(false);
+      // Reload profile to get updated data
+      await loadProfile(user.id);
+    } catch (error) {
+      console.error('Failed to update preferences:', error);
+      alert('Failed to save preferences. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -139,6 +187,282 @@ export default function Profile() {
             color: 'var(--color-gray-600)',
           }}>
             No active quests right now. Check back soon! 🎯
+          </div>
+        )}
+      </div>
+
+      {/* User Preferences Section */}
+      <div className="card" style={{ padding: 'var(--space-6)', marginBottom: 'var(--space-6)' }}>
+        <div 
+          style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            cursor: 'pointer',
+            marginBottom: preferencesExpanded ? 'var(--space-6)' : 0
+          }}
+          onClick={() => setPreferencesExpanded(!preferencesExpanded)}
+        >
+          <h3 style={{ fontSize: 'var(--text-xl)', margin: 0 }}>
+            ⚙️ User Preferences
+          </h3>
+          <span style={{ fontSize: '24px', transition: 'transform var(--transition-base)', transform: preferencesExpanded ? 'rotate(180deg)' : 'none' }}>
+            ▼
+          </span>
+        </div>
+
+        {preferencesExpanded && (
+          <div style={{ marginTop: 'var(--space-4)' }}>
+            {/* Edit/Save Buttons */}
+            <div style={{ marginBottom: 'var(--space-4)', display: 'flex', gap: 'var(--space-2)' }}>
+              {!editingPreferences ? (
+                <Button variant="primary" size="sm" onClick={() => setEditingPreferences(true)}>
+                  ✏️ Edit Preferences
+                </Button>
+              ) : (
+                <>
+                  <Button variant="primary" size="sm" onClick={handleSavePreferences}>
+                    💾 Save Changes
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={() => {
+                    setEditingPreferences(false);
+                    // Reset to user data
+                    if (user) loadProfile(user.id);
+                  }}>
+                    ✖️ Cancel
+                  </Button>
+                </>
+              )}
+            </div>
+
+            {/* Location */}
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <label style={{ display: 'block', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>
+                📍 Location
+              </label>
+              {editingPreferences ? (
+                <input
+                  type="text"
+                  value={preferences.location}
+                  onChange={(e) => setPreferences({ ...preferences, location: e.target.value })}
+                  placeholder="e.g., Seattle, WA"
+                  style={{
+                    width: '100%',
+                    padding: 'var(--space-3)',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '2px solid var(--color-border)',
+                    fontSize: 'var(--text-body)',
+                  }}
+                />
+              ) : (
+                <div style={{ padding: 'var(--space-3)', background: 'var(--color-gray-100)', borderRadius: 'var(--radius-sm)' }}>
+                  {preferences.location || 'Not set'}
+                </div>
+              )}
+            </div>
+
+            {/* Time Window */}
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <label style={{ display: 'block', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>
+                🕐 Preferred Meeting Times
+              </label>
+              {editingPreferences ? (
+                <input
+                  type="text"
+                  value={preferences.timeWindow}
+                  onChange={(e) => setPreferences({ ...preferences, timeWindow: e.target.value })}
+                  placeholder="e.g., Weekends 10am-4pm"
+                  style={{
+                    width: '100%',
+                    padding: 'var(--space-3)',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '2px solid var(--color-border)',
+                    fontSize: 'var(--text-body)',
+                  }}
+                />
+              ) : (
+                <div style={{ padding: 'var(--space-3)', background: 'var(--color-gray-100)', borderRadius: 'var(--radius-sm)' }}>
+                  {preferences.timeWindow || 'Not set'}
+                </div>
+              )}
+            </div>
+
+            {/* Travel Mode & Max Minutes */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
+              <div>
+                <label style={{ display: 'block', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>
+                  🚗 Travel Mode
+                </label>
+                {editingPreferences ? (
+                  <select
+                    value={preferences.travelMode}
+                    onChange={(e) => setPreferences({ ...preferences, travelMode: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: 'var(--space-3)',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '2px solid var(--color-border)',
+                      fontSize: 'var(--text-body)',
+                    }}
+                  >
+                    <option value="driving">Driving</option>
+                    <option value="walking">Walking</option>
+                    <option value="bike">Bike</option>
+                  </select>
+                ) : (
+                  <div style={{ padding: 'var(--space-3)', background: 'var(--color-gray-100)', borderRadius: 'var(--radius-sm)', textTransform: 'capitalize' }}>
+                    {preferences.travelMode}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>
+                  ⏱️ Max Travel Time (minutes)
+                </label>
+                {editingPreferences ? (
+                  <input
+                    type="number"
+                    value={preferences.maxMinutes}
+                    onChange={(e) => setPreferences({ ...preferences, maxMinutes: parseInt(e.target.value) || 20 })}
+                    min="5"
+                    max="60"
+                    style={{
+                      width: '100%',
+                      padding: 'var(--space-3)',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '2px solid var(--color-border)',
+                      fontSize: 'var(--text-body)',
+                    }}
+                  />
+                ) : (
+                  <div style={{ padding: 'var(--space-3)', background: 'var(--color-gray-100)', borderRadius: 'var(--radius-sm)' }}>
+                    {preferences.maxMinutes} minutes
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Checkboxes */}
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <label style={{ display: 'block', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-3)' }}>
+                Accessibility & Preferences
+              </label>
+              
+              <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', cursor: editingPreferences ? 'pointer' : 'default' }}>
+                <input
+                  type="checkbox"
+                  checked={preferences.indoorPreferred}
+                  onChange={(e) => editingPreferences && setPreferences({ ...preferences, indoorPreferred: e.target.checked })}
+                  disabled={!editingPreferences}
+                  style={{ width: '20px', height: '20px' }}
+                />
+                <span>🏢 Indoor Preferred</span>
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', cursor: editingPreferences ? 'pointer' : 'default' }}>
+                <input
+                  type="checkbox"
+                  checked={preferences.wheelchairAccess}
+                  onChange={(e) => editingPreferences && setPreferences({ ...preferences, wheelchairAccess: e.target.checked })}
+                  disabled={!editingPreferences}
+                  style={{ width: '20px', height: '20px' }}
+                />
+                <span>♿ Wheelchair Access Needed</span>
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', cursor: editingPreferences ? 'pointer' : 'default' }}>
+                <input
+                  type="checkbox"
+                  checked={preferences.parkingNeeded}
+                  onChange={(e) => editingPreferences && setPreferences({ ...preferences, parkingNeeded: e.target.checked })}
+                  disabled={!editingPreferences}
+                  style={{ width: '20px', height: '20px' }}
+                />
+                <span>🅿️ Parking Needed</span>
+              </label>
+            </div>
+
+            {/* Categories of Interest */}
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <label style={{ display: 'block', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>
+                🎮 Categories of Interest
+              </label>
+              {editingPreferences ? (
+                <input
+                  type="text"
+                  value={preferences.categoryInterests.join(', ')}
+                  onChange={(e) => setPreferences({ ...preferences, categoryInterests: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
+                  placeholder="e.g., LEGO, Pokemon cards, board games"
+                  style={{
+                    width: '100%',
+                    padding: 'var(--space-3)',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '2px solid var(--color-border)',
+                    fontSize: 'var(--text-body)',
+                  }}
+                />
+              ) : (
+                <div style={{ padding: 'var(--space-3)', background: 'var(--color-gray-100)', borderRadius: 'var(--radius-sm)' }}>
+                  {preferences.categoryInterests.length > 0 ? preferences.categoryInterests.join(', ') : 'Not set'}
+                </div>
+              )}
+            </div>
+
+            {/* Guardian Info */}
+            {user && (user as any).age && (user as any).age < 18 && (
+              <>
+                <div style={{ marginBottom: 'var(--space-4)' }}>
+                  <label style={{ display: 'block', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>
+                    👨‍👩‍👧 Guardian Name
+                  </label>
+                  {editingPreferences ? (
+                    <input
+                      type="text"
+                      value={preferences.guardianName}
+                      onChange={(e) => setPreferences({ ...preferences, guardianName: e.target.value })}
+                      placeholder="Guardian's name"
+                      style={{
+                        width: '100%',
+                        padding: 'var(--space-3)',
+                        borderRadius: 'var(--radius-sm)',
+                        border: '2px solid var(--color-border)',
+                        fontSize: 'var(--text-body)',
+                      }}
+                    />
+                  ) : (
+                    <div style={{ padding: 'var(--space-3)', background: 'var(--color-gray-100)', borderRadius: 'var(--radius-sm)' }}>
+                      {preferences.guardianName || 'Not set'}
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ marginBottom: 'var(--space-4)' }}>
+                  <label style={{ display: 'block', fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-2)' }}>
+                    📧 Guardian Email
+                  </label>
+                  {editingPreferences ? (
+                    <input
+                      type="email"
+                      value={preferences.guardianEmail}
+                      onChange={(e) => setPreferences({ ...preferences, guardianEmail: e.target.value })}
+                      placeholder="guardian@example.com"
+                      style={{
+                        width: '100%',
+                        padding: 'var(--space-3)',
+                        borderRadius: 'var(--radius-sm)',
+                        border: '2px solid var(--color-border)',
+                        fontSize: 'var(--text-body)',
+                      }}
+                    />
+                  ) : (
+                    <div style={{ padding: 'var(--space-3)', background: 'var(--color-gray-100)', borderRadius: 'var(--radius-sm)' }}>
+                      {preferences.guardianEmail || 'Not set'}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
