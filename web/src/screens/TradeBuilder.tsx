@@ -1,21 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ai, api } from '../utils/api';
-import { estimateTradeXP } from '../utils/xp';
-import { getBalancingSuggestion } from '../utils/tradeRating';
 import ItemCard from '../components/cards/ItemCard';
 import OfferItemCard from '../components/trade/OfferItemCard';
-import ReadyIndicator from '../components/trade/ReadyIndicator';
 import EventLog from '../components/trade/EventLog';
 import Button from '../components/ui/Button';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import Confetti from '../components/ui/Confetti';
-import MeetupAssistant, { MeetupDetails } from '../components/meetup/MeetupAssistant';
 import type { InventoryItem, FairnessResponse, User } from '../types';
 
 type TradeEvent = {
   id: string;
-  type: 'item_add' | 'item_remove' | 'ready' | 'not_ready' | 'both_ready' | 'confirmed' | 'meetup';
+  type: 'item_add' | 'item_remove' | 'confirmed';
   message: string;
   timestamp: Date;
 };
@@ -38,19 +34,13 @@ export default function TradeBuilder() {
   const [myOffer, setMyOffer] = useState<string[]>([]);
   const [theirOffer, setTheirOffer] = useState<string[]>([]);
 
-  // Ready states
-  const [myReady, setMyReady] = useState(false);
-  const [theirReady, setTheirReady] = useState(false);
-
   // UI state
   const [fairness, setFairness] = useState<FairnessResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [calculating, setCalculating] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
-  const [showOfferChangedNotice, setShowOfferChangedNotice] = useState(false);
   const [events, setEvents] = useState<TradeEvent[]>([]);
-  const [meetupDetails, setMeetupDetails] = useState<MeetupDetails | null>(null);
-  const [showMeetupAssistant, setShowMeetupAssistant] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
   
   // Mobile tabs
   const [mobileInventoryTab, setMobileInventoryTab] = useState<'mine' | 'theirs'>('mine');
@@ -85,13 +75,6 @@ export default function TradeBuilder() {
     calculateFairness();
   }, [myOffer, theirOffer]);
 
-  // Show meetup assistant after both ready
-  useEffect(() => {
-    if (myReady && theirReady && !meetupDetails) {
-      setShowMeetupAssistant(true);
-    }
-  }, [myReady, theirReady, meetupDetails]);
-
   async function loadData(userId: string) {
     setLoading(true);
     try {
@@ -109,7 +92,7 @@ export default function TradeBuilder() {
         {
           id: 'u_demo_2',
           username: 'Anderson',
-          avatar: '🎮',
+        avatar: '🎮',
           level: 5,
           xp: 820,
           xpToNextLevel: 1000,
@@ -120,11 +103,11 @@ export default function TradeBuilder() {
           id: 'user-3',
           username: 'TradingBuddy',
           avatar: '🚀',
-          level: 3,
-          xp: 250,
-          xpToNextLevel: 500,
-          hasGuardian: true,
-          createdAt: new Date().toISOString(),
+        level: 3,
+        xp: 250,
+        xpToNextLevel: 500,
+        hasGuardian: true,
+        createdAt: new Date().toISOString(),
         },
         {
           id: 'user-4',
@@ -159,7 +142,6 @@ export default function TradeBuilder() {
       
       // Clear offers when switching users
       setTheirOffer([]);
-      clearReadiness();
     } catch (error) {
       console.error('Failed to load user inventory:', error);
       // Set mock data
@@ -184,7 +166,8 @@ export default function TradeBuilder() {
   }, [selectedUserId]);
 
   async function calculateFairness() {
-    if (myOffer.length === 0 || theirOffer.length === 0) {
+    // Only skip if BOTH sides are empty
+    if (myOffer.length === 0 && theirOffer.length === 0) {
       setFairness(null);
       return;
     }
@@ -199,6 +182,21 @@ export default function TradeBuilder() {
         const item = theirInventory.find(i => i.id === id);
         return item?.valuation.estimate.mid || 0;
       });
+
+      // Skip AI fairness check for giveaways (one side empty)
+      if (myOffer.length === 0 || theirOffer.length === 0) {
+        const totalA = myValues.reduce((sum, v) => sum + v, 0);
+        const totalB = theirValues.reduce((sum, v) => sum + v, 0);
+        setFairness({
+          fairness: 1.0,
+          warn: false,
+          A: totalA,
+          B: totalB,
+          diff: totalB - totalA,
+        });
+        setCalculating(false);
+        return;
+      }
 
       const result = await ai.unevenScore(myValues, theirValues);
       setFairness(result);
@@ -232,16 +230,6 @@ export default function TradeBuilder() {
     }]);
   }
 
-  function clearReadiness() {
-    if (myReady || theirReady) {
-      setMyReady(false);
-      setTheirReady(false);
-      setShowOfferChangedNotice(true);
-      addEvent('not_ready', 'Offer changed — readiness cleared');
-      setTimeout(() => setShowOfferChangedNotice(false), 3000);
-    }
-  }
-
   function addToMyOffer(itemId: string) {
     if (myOffer.includes(itemId)) {
       // Highlight already added (visual feedback)
@@ -258,7 +246,6 @@ export default function TradeBuilder() {
     if (item) {
       addEvent('item_add', `You added: ${item.title}`);
     }
-    clearReadiness();
   }
 
   function removeFromMyOffer(itemId: string) {
@@ -267,7 +254,6 @@ export default function TradeBuilder() {
     if (item) {
       addEvent('item_remove', `You removed: ${item.title}`);
     }
-    clearReadiness();
   }
 
   function addToTheirOffer(itemId: string) {
@@ -285,7 +271,6 @@ export default function TradeBuilder() {
     if (item) {
       addEvent('item_add', `They added: ${item.title}`);
     }
-    clearReadiness();
   }
 
   function removeFromTheirOffer(itemId: string) {
@@ -293,28 +278,6 @@ export default function TradeBuilder() {
     const item = theirInventory.find(i => i.id === itemId);
     if (item) {
       addEvent('item_remove', `They removed: ${item.title}`);
-    }
-    clearReadiness();
-  }
-
-  function toggleMyReady() {
-    const newState = !myReady;
-    setMyReady(newState);
-    addEvent(newState ? 'ready' : 'not_ready', newState ? 'You are ready' : 'You are not ready');
-    
-    if (newState && theirReady) {
-      addEvent('both_ready', 'Both ready — confirm available');
-    }
-  }
-
-  function toggleTheirReady() {
-    // Simulate their ready toggle (in real app, this comes from backend/websocket)
-    const newState = !theirReady;
-    setTheirReady(newState);
-    addEvent(newState ? 'ready' : 'not_ready', newState ? 'They are ready' : 'They are not ready');
-    
-    if (newState && myReady) {
-      addEvent('both_ready', 'Both ready — confirm available');
     }
   }
 
@@ -341,10 +304,6 @@ export default function TradeBuilder() {
     if (draggedItem && draggedItem.source === 'theirs') {
       addToTheirOffer(draggedItem.id);
     }
-    setDraggedItem(null);
-  }
-
-  function handleDragEnd() {
     setDraggedItem(null);
   }
 
@@ -392,32 +351,9 @@ export default function TradeBuilder() {
     }
   }
 
-  function handleSetMeetup(details: MeetupDetails) {
-    setMeetupDetails(details);
-    addEvent('meetup', `Meet-up proposed: ${details.venue.name}, ${details.time}`);
-    setShowMeetupAssistant(false);
-  }
-
-  function handleUpdateMeetup(details: MeetupDetails) {
-    setMeetupDetails(details);
-    addEvent('meetup', `Meet-up updated: ${details.venue.name}, ${details.time}`);
-  }
-
-  // Calculate totals and derived values
-  const myTotal = myOffer.reduce((sum, id) => {
-    const item = myInventory.find(i => i.id === id);
-    return sum + (item?.valuation.estimate.mid || 0);
-  }, 0);
-
-  const theirTotal = theirOffer.reduce((sum, id) => {
-    const item = theirInventory.find(i => i.id === id);
-    return sum + (item?.valuation.estimate.mid || 0);
-  }, 0);
-
-  const diff = theirTotal - myTotal;
-  const balancingSuggestion = fairness && fairness.warn ? getBalancingSuggestion(diff) : null;
-  const bothReady = myReady && theirReady;
-  const canConfirm = bothReady && myOffer.length > 0 && theirOffer.length > 0;
+  // Allow offers even if one side is empty (for giveaways)
+  const hasAnyItems = myOffer.length > 0 || theirOffer.length > 0;
+  const canSendOffer = hasAnyItems && !calculating && confirmed;
 
   // Keyboard navigation
   useEffect(() => {
@@ -427,16 +363,8 @@ export default function TradeBuilder() {
         return;
       }
 
-      // Space: toggle ready (when offers are not empty)
-      if (e.key === ' ' || e.key === 'Spacebar') {
-        if (myOffer.length > 0 && theirOffer.length > 0) {
-          e.preventDefault();
-          toggleMyReady();
-        }
-      }
-
-      // Enter: confirm trade if both ready
-      if (e.key === 'Enter' && canConfirm && !calculating) {
+      // Enter: send trade offer if valid
+      if (e.key === 'Enter' && canSendOffer) {
         e.preventDefault();
         handleConfirmTrade();
       }
@@ -444,7 +372,7 @@ export default function TradeBuilder() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [myReady, canConfirm, calculating, myOffer.length, theirOffer.length]);
+  }, [canSendOffer]);
 
   if (loading || !myUser) {
     return (
@@ -574,8 +502,8 @@ export default function TradeBuilder() {
                     color: 'var(--color-brand)',
                   }}>
                     ✓
-                  </div>
-                )}
+        </div>
+      )}
               </div>
             ))}
         </div>
@@ -595,39 +523,6 @@ export default function TradeBuilder() {
           </div>
         )}
       </div>
-
-      {/* Keyboard shortcuts hint */}
-      <div style={{
-        textAlign: 'center',
-        fontSize: 'var(--text-sm)',
-        color: 'var(--color-gray-600)',
-        marginBottom: 'var(--space-6)',
-      }}>
-        ⌨️ <strong>Keyboard:</strong> Click or Enter to add items • Delete to remove • Space to toggle ready • Enter to send offer
-      </div>
-
-      {/* Offer Changed Notice */}
-      {showOfferChangedNotice && (
-        <div
-          style={{
-            position: 'fixed',
-            top: '80px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: 'var(--color-warning)',
-            color: 'var(--color-white)',
-            padding: 'var(--space-3) var(--space-6)',
-            borderRadius: 'var(--radius-lg)',
-            boxShadow: 'var(--shadow-xl)',
-            zIndex: 1000,
-            fontSize: 'var(--text-base)',
-            fontWeight: 'var(--font-semibold)',
-            animation: 'slideDown 0.3s ease-out',
-          }}
-        >
-          ⚠️ Offer changed — readiness cleared
-        </div>
-      )}
 
       {/* No user selected or user data loading */}
       {!selectedUserId && (
@@ -693,31 +588,26 @@ export default function TradeBuilder() {
 
         {/* Center: Trade Room */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-          {/* Event Log */}
-          {events.length > 0 && <EventLog events={events} />}
-
-          {/* Your Offer */}
+          {/* Your Items */}
           <div>
-            <ReadyIndicator user={myUser} ready={myReady} side="yours" />
+            <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-bold)', marginBottom: 'var(--space-3)', color: 'var(--color-teal)' }}>
+              Your Items
+            </h3>
             <div
               style={{
-                marginTop: 'var(--space-3)',
                 padding: 'var(--space-4)',
                 background: 'var(--color-teal-light)',
                 borderRadius: 'var(--radius-lg)',
-                minHeight: '200px',
+                minHeight: '150px',
                 border: draggedItem?.source === 'mine' ? '3px dashed var(--color-teal-dark)' : undefined,
                 transition: 'border var(--transition-fast)',
               }}
               onDragOver={handleDragOver}
               onDrop={handleDropToMyOffer}
             >
-              <h3 style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-bold)', marginBottom: 'var(--space-3)', color: 'var(--color-teal-dark)' }}>
-                Your Offer
-              </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                 {myOffer.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: 'var(--space-6)', color: 'var(--color-teal-dark)', opacity: 0.6 }}>
+                  <div style={{ textAlign: 'center', padding: 'var(--space-4)', color: 'var(--color-teal-dark)', opacity: 0.6 }}>
                     Click items from your inventory to add
                   </div>
                 ) : (
@@ -739,28 +629,26 @@ export default function TradeBuilder() {
             </div>
           </div>
 
-          {/* Their Offer */}
+          {/* Their Items */}
           <div>
-            <ReadyIndicator user={theirUser} ready={theirReady} side="theirs" />
+            <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-bold)', marginBottom: 'var(--space-3)', color: 'var(--color-lilac)' }}>
+              {theirUser?.username}'s Items
+            </h3>
             <div
               style={{
-                marginTop: 'var(--space-3)',
                 padding: 'var(--space-4)',
                 background: 'var(--color-lilac-light)',
                 borderRadius: 'var(--radius-lg)',
-                minHeight: '200px',
+                minHeight: '150px',
                 border: draggedItem?.source === 'theirs' ? '3px dashed var(--color-lilac-dark)' : undefined,
                 transition: 'border var(--transition-fast)',
               }}
               onDragOver={handleDragOver}
               onDrop={handleDropToTheirOffer}
             >
-              <h3 style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-bold)', marginBottom: 'var(--space-3)', color: 'var(--color-lilac-dark)' }}>
-                Their Offer
-              </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                 {theirOffer.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: 'var(--space-6)', color: 'var(--color-lilac-dark)', opacity: 0.6 }}>
+                  <div style={{ textAlign: 'center', padding: 'var(--space-4)', color: 'var(--color-lilac-dark)', opacity: 0.6 }}>
                     Click items from their inventory to add
                   </div>
                 ) : (
@@ -782,166 +670,54 @@ export default function TradeBuilder() {
             </div>
           </div>
 
-          {/* Totals & Fairness */}
-          {(myOffer.length > 0 || theirOffer.length > 0) && (
+          {/* Confirmation Checkbox */}
             <div
               style={{
-                background: 'var(--color-white)',
                 padding: 'var(--space-4)',
+              background: 'var(--color-white)',
                 borderRadius: 'var(--radius-lg)',
                 boxShadow: 'var(--shadow-md)',
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
-                <div>
-                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-gray-600)', marginBottom: 'var(--space-1)' }}>
-                    Your Total
-                  </div>
-                  <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 'var(--font-bold)', color: 'var(--color-teal)' }}>
-                    ${myTotal}
-                  </div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-gray-600)', marginBottom: 'var(--space-1)' }}>
-                    Their Total
-                  </div>
-                  <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 'var(--font-bold)', color: 'var(--color-lilac)' }}>
-                    ${theirTotal}
-                  </div>
-                </div>
-              </div>
-
-              {fairness && (
-                <>
-                  <div style={{
-                    height: '12px',
-                    background: 'var(--color-gray-200)',
-                    borderRadius: 'var(--radius-full)',
-                    overflow: 'hidden',
-                    marginBottom: 'var(--space-2)',
-                  }}>
-                    <div style={{
-                      height: '100%',
-                      width: `${fairness.fairness * 100}%`,
-                      background: fairness.warn
-                        ? 'var(--color-rating-bad)'
-                        : fairness.fairness >= 0.9
-                        ? 'var(--color-rating-great)'
-                        : 'var(--color-rating-fair)',
-                      transition: 'all var(--transition-base)',
-                    }} />
-                  </div>
-
-                  <div style={{
-                    fontSize: 'var(--text-sm)',
-                    textAlign: 'center',
-                    color: fairness.warn
-                      ? 'var(--color-rating-bad)'
-                      : fairness.fairness >= 0.9
-                      ? 'var(--color-rating-great)'
-                      : 'var(--color-rating-fair)',
-                    fontWeight: 'var(--font-semibold)',
-                    marginBottom: 'var(--space-2)',
-                  }}>
-                    {fairness.warn ? 'bad' : fairness.fairness >= 0.9 ? 'great' : 'fair'}
-                  </div>
-
-                  {balancingSuggestion && (
-                    <div style={{
-                      fontSize: 'var(--text-sm)',
-                      color: 'var(--color-gray-700)',
-                      textAlign: 'center',
-                      padding: 'var(--space-2)',
-                      background: 'var(--color-gray-100)',
-                      borderRadius: 'var(--radius-md)',
-                    }}>
-                      💡 {balancingSuggestion}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Meetup Details Chip */}
-          {meetupDetails && (
-            <div style={{
-              background: 'var(--color-green-light)',
-              padding: 'var(--space-2)',
-              borderRadius: 'var(--radius-md)',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}>
-              <span>
-                📍 Meet-up: {meetupDetails.venue.name} · {meetupDetails.time}
-              </span>
-              <Button
-                variant="ghost"
-                onClick={() => setShowMeetupAssistant(true)}
-                style={{ fontSize: 'var(--text-sm)' }}
-              >
-                Suggest different
-              </Button>
-            </div>
-          )}
-
-          {/* Meetup Assistant */}
-          {showMeetupAssistant && (
-            <MeetupAssistant
-              isUnder18={myUser?.hasGuardian}
-              onSetMeetup={meetupDetails ? handleUpdateMeetup : handleSetMeetup}
-              onDismiss={() => setShowMeetupAssistant(false)}
-            />
-          )}
-
-          {/* Ready Toggle */}
-          <Button
-            variant={myReady ? 'secondary' : 'primary'}
-            onClick={toggleMyReady}
-            disabled={myOffer.length === 0 || theirOffer.length === 0}
-            style={{ width: '100%' }}
-          >
-            {myReady ? '❌ Not Ready' : '✓ Ready to Trade'}
-          </Button>
-
-          {/* Simulate their ready (for demo) */}
-          <Button
-            variant="ghost"
-            onClick={toggleTheirReady}
-            style={{ fontSize: 'var(--text-sm)', opacity: 0.6 }}
-          >
-            [Demo: Toggle Their Ready]
-          </Button>
-
-          {/* Confirm Trade */}
-          {canConfirm && (
-            <div
+            <label
               style={{
-                background: 'var(--color-success)',
-                color: 'var(--color-white)',
-                padding: 'var(--space-4)',
-                borderRadius: 'var(--radius-lg)',
-                textAlign: 'center',
-                animation: 'pulse 1s infinite',
+              display: 'flex',
+              alignItems: 'center',
+                gap: 'var(--space-3)',
+                cursor: 'pointer',
+                fontSize: 'var(--text-base)',
               }}
             >
+              <input
+                type="checkbox"
+                checked={confirmed}
+                onChange={(e) => setConfirmed(e.target.checked)}
+                style={{
+                  width: '20px',
+                  height: '20px',
+                  cursor: 'pointer',
+                }}
+              />
+              <span style={{ fontWeight: 'var(--font-medium)' }}>
+                I confirm this trade offer
+              </span>
+            </label>
+            </div>
+
+          {/* Make Offer Button */}
               <Button
                 variant="primary"
                 onClick={handleConfirmTrade}
-                disabled={calculating}
+            disabled={!canSendOffer}
                 style={{
                   width: '100%',
-                  background: 'var(--color-white)',
-                  color: 'var(--color-success)',
+              background: canSendOffer ? 'var(--color-success)' : undefined,
                   fontSize: 'var(--text-lg)',
                   fontWeight: 'var(--font-bold)',
                 }}
               >
-                {calculating ? <LoadingSpinner /> : '📤 Send Trade Offer'}
+            {calculating ? <LoadingSpinner /> : 'Make Offer'}
               </Button>
-            </div>
-          )}
         </div>
 
         {/* Right: Their Inventory */}
@@ -1035,14 +811,14 @@ export default function TradeBuilder() {
               onClick={() => setMobileOfferTab('mine')}
               style={{ flex: 1 }}
             >
-              Your Offer ({myOffer.length})
+              Your Items ({myOffer.length})
             </Button>
             <Button
               variant={mobileOfferTab === 'theirs' ? 'primary' : 'secondary'}
               onClick={() => setMobileOfferTab('theirs')}
               style={{ flex: 1 }}
             >
-              Their Offer ({theirOffer.length})
+              {theirUser?.username}'s Items ({theirOffer.length})
             </Button>
           </div>
 
@@ -1054,8 +830,7 @@ export default function TradeBuilder() {
           }}>
             {mobileOfferTab === 'mine' ? (
               <>
-                <ReadyIndicator user={myUser} ready={myReady} side="yours" />
-                <div style={{ marginTop: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                   {myOffer.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: 'var(--space-6)', color: 'var(--color-teal-dark)', opacity: 0.6 }}>
                       No items in your offer
@@ -1078,8 +853,7 @@ export default function TradeBuilder() {
               </>
             ) : (
               <>
-                <ReadyIndicator user={theirUser} ready={theirReady} side="theirs" />
-                <div style={{ marginTop: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                   {theirOffer.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: 'var(--space-6)', color: 'var(--color-lilac-dark)', opacity: 0.6 }}>
                       No items in their offer
@@ -1120,49 +894,45 @@ export default function TradeBuilder() {
             zIndex: 100,
           }}
         >
-          {fairness && (
-            <div style={{ marginBottom: 'var(--space-3)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-2)', fontSize: 'var(--text-sm)' }}>
-                <span>You: ${myTotal}</span>
-                <span style={{
-                  color: fairness.warn
-                    ? 'var(--color-rating-bad)'
-                    : fairness.fairness >= 0.9
-                    ? 'var(--color-rating-great)'
-                    : 'var(--color-rating-fair)',
-                  fontWeight: 'var(--font-bold)',
-                }}>
-                  {fairness.warn ? 'bad' : fairness.fairness >= 0.9 ? 'great' : 'fair'}
+          {/* Confirmation Checkbox */}
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-2)',
+              cursor: 'pointer',
+              fontSize: 'var(--text-sm)',
+              marginBottom: 'var(--space-3)',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={confirmed}
+              onChange={(e) => setConfirmed(e.target.checked)}
+              style={{
+                width: '18px',
+                height: '18px',
+                cursor: 'pointer',
+              }}
+            />
+            <span style={{ fontWeight: 'var(--font-medium)' }}>
+              I confirm this trade offer
                 </span>
-                <span>Them: ${theirTotal}</span>
-              </div>
-              {balancingSuggestion && (
-                <div style={{ fontSize: 'var(--text-xs)', textAlign: 'center', color: 'var(--color-gray-600)' }}>
-                  {balancingSuggestion}
-                </div>
-              )}
-            </div>
-          )}
+          </label>
 
-          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-            <Button
-              variant={myReady ? 'secondary' : 'primary'}
-              onClick={toggleMyReady}
-              disabled={myOffer.length === 0 || theirOffer.length === 0}
-              style={{ flex: 1 }}
-            >
-              {myReady ? '❌ Not Ready' : '✓ Ready'}
-            </Button>
-            {canConfirm && (
               <Button
                 variant="primary"
                 onClick={handleConfirmTrade}
-                style={{ flex: 2, background: 'var(--color-success)', fontWeight: 'var(--font-bold)' }}
-              >
-                📤 Send Offer
+            disabled={!canSendOffer}
+            style={{
+              width: '100%',
+              background: canSendOffer ? 'var(--color-success)' : undefined,
+              fontWeight: 'var(--font-bold)',
+              fontSize: 'var(--text-lg)',
+            }}
+          >
+            {calculating ? <LoadingSpinner /> : 'Make Offer'}
               </Button>
-            )}
-          </div>
         </div>
       </div>
 
