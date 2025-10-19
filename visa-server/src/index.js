@@ -15,6 +15,8 @@ app.use('/api/trades', require('./routes/trades'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/merchants', require('./routes/merchants'));
 app.use('/api/guardian', require('./routes/guardian'));
+app.use('/api/discover', require('./routes/discover'));
+app.use('/api/messages', require('./routes/messages'));
 
 // 404
 app.use((_req, res) => res.status(404).json({ ok: false, error: 'not_found' }));

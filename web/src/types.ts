@@ -1,3 +1,4 @@
+// ========== AI Feature Types (existing) ==========
 export type Facts = {
   category: string;
   brand: string;
@@ -53,4 +54,118 @@ export type MeetupSuggestion = {
 export type MeetupResponse = {
   suggestions: MeetupSuggestion[];
   disclaimer: string;
+};
+
+// ========== User & Profile Types ==========
+export type User = {
+  id: string;
+  username: string;
+  avatar: string;
+  level: number;
+  xp: number;
+  xpToNextLevel: number;
+  hasGuardian: boolean;
+  guardianNote?: string;
+  createdAt: string;
+};
+
+export type UserProfile = User & {
+  badges: Badge[];
+  stats: {
+    totalTrades: number;
+    fairTrades: number;
+    inventorySize: number;
+    messagesExchanged: number;
+  };
+};
+
+// ========== Inventory & Items ==========
+export type InventoryItem = {
+  id: string;
+  userId: string;
+  images: string[]; // URLs or base64
+  title: string;
+  description?: string;
+  facts: Facts;
+  valuation: ValuationResponse;
+  category: string;
+  condition: 'new' | 'ln' | 'good' | 'fair' | 'poor';
+  addedAt: string;
+};
+
+// ========== Trade Types ==========
+export type TradeRating = 'great' | 'fair' | 'bad';
+
+export type TradeOffer = {
+  items: InventoryItem[];
+  totalValue: number; // sum of MID values
+};
+
+export type Trade = {
+  id: string;
+  fromUserId: string;
+  toUserId: string;
+  fromUser: User;
+  toUser: User;
+  offerA: TradeOffer; // from user's offer
+  offerB: TradeOffer; // to user's offer
+  status: 'draft' | 'proposed' | 'accepted' | 'declined' | 'completed' | 'canceled';
+  fairness: FairnessResponse;
+  rating?: TradeRating;
+  proposedAt?: string;
+  completedAt?: string;
+  xpAwarded?: number;
+};
+
+// ========== Messages ==========
+export type Message = {
+  id: string;
+  conversationId: string;
+  fromUserId: string;
+  toUserId: string;
+  text: string;
+  moderation?: ModerationResult;
+  sentAt: string;
+  read: boolean;
+};
+
+export type Conversation = {
+  id: string;
+  participants: User[];
+  lastMessage?: Message;
+  unreadCount: number;
+  trade?: Trade; // associated trade if any
+};
+
+// ========== Gamification Types ==========
+export type Level = {
+  level: number;
+  name: string;
+  xpRequired: number;
+};
+
+export type Badge = {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  earnedAt?: string;
+};
+
+export type Quest = {
+  id: string;
+  title: string;
+  description: string;
+  xpReward: number;
+  progress: number;
+  target: number;
+  completed: boolean;
+  expiresAt: string;
+};
+
+export type XPEvent = {
+  action: string;
+  xpAwarded: number;
+  reason: string;
+  timestamp: string;
 };
