@@ -194,6 +194,17 @@ async function findUserById(id) {
   return publicUser;
 }
 
+async function getAllUsers() {
+  const db = await readJson(usersFile);
+  // Return all users without passwords
+  const users = {};
+  for (const [id, user] of Object.entries(db.byId)) {
+    const { passwordHash, ...publicUser } = user;
+    users[id] = publicUser;
+  }
+  return users;
+}
+
 async function verifyPassword(user, password) {
   return bcrypt.compare(password || '', user.passwordHash);
 }
@@ -295,6 +306,7 @@ module.exports = {
   createUser,
   findUserByEmail,
   findUserById,
+  getAllUsers,
   verifyPassword,
   setUserPassword,
   updateUserProfile,

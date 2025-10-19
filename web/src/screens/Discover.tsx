@@ -54,13 +54,16 @@ export default function Discover() {
   async function loadItems() {
     setLoading(true);
     try {
+      console.log('[Discover] Fetching items with filters:', filters, 'search:', search);
       const result = await api.discover.browse({
         ...filters,
         search: search || undefined,
       });
+      console.log('[Discover] Received result:', result);
+      console.log('[Discover] Items count:', result.items?.length || 0);
       setItems(result.items || []);
     } catch (error) {
-      console.error('Failed to load items:', error);
+      console.error('[Discover] Failed to load items:', error);
       setItems([]);
     } finally {
       setLoading(false);

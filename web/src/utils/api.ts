@@ -216,8 +216,23 @@ export const api = {
 
   discover: {
     browse(filters: any) {
-      // Mock for now - returns empty
-      return Promise.resolve({ items: [] });
+      return withAuth((headers) => {
+        // Build query string from filters
+        const params = new URLSearchParams();
+        if (filters.category) params.append('category', filters.category);
+        if (filters.condition) params.append('condition', filters.condition);
+        if (filters.tradeValue) params.append('tradeValue', filters.tradeValue);
+        if (filters.search) params.append('search', filters.search);
+        if (filters.sort) params.append('sort', filters.sort);
+        
+        const queryString = params.toString();
+        const url = `${DATA_BASE_URL}/api/discover${queryString ? `?${queryString}` : ''}`;
+        
+        return fetchJSON(url, {
+          method: 'GET',
+          headers,
+        });
+      });
     },
   },
 
