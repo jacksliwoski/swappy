@@ -1,0 +1,13 @@
+# node
+node_modules/
+
+# local env & certs (NEVER COMMIT)
+.env
+.env.*
+visa-cert/
+*.pem
+*.crt
+
+# misc
+.DS_Store
+*.log
