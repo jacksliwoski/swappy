@@ -70,6 +70,25 @@ router.get('/:userId', requireAuth, async (req, res) => {
   res.json({ ok: true, conversations });
 });
 
+// POST /api/messages/ensure - Ensure or create a conversation between two users
+router.post('/ensure', requireAuth, async (req, res) => {
+  try {
+    const { userA, userB } = req.body || {};
+    if (!userA || !userB) return res.status(400).json({ ok: false, error: 'userA and userB required' });
+
+    // Conversation id deterministic for demo: conv-<smaller>-<larger>
+    const convId = userA < userB ? `conv-${userA}-${userB}` : `conv-${userB}-${userA}`;
+
+    // Ensure at least an empty conversation exists in store.messages (no-op)
+    if (!store.messages) store.messages = new Map();
+
+    return res.json({ ok: true, conversationId: convId });
+  } catch (err) {
+    console.error('[Messages API] ensure conversation error:', err);
+    return res.status(500).json({ ok: false, error: 'Failed to ensure conversation' });
+  }
+});
+
 // GET /api/messages/:userId/:conversationId - Get messages for a conversation
 router.get('/:userId/:conversationId', requireAuth, (req, res) => {
   const { userId, conversationId } = req.params;

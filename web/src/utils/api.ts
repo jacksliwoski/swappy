@@ -5,7 +5,7 @@ const AI_BASE_URL =
 
 const DATA_BASE_URL =
   (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_URL) ||
-  'http://localhost:7002';
+  'http://localhost:7003';
 
 async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
   try {
@@ -347,6 +347,16 @@ export const api = {
         })
       );
     },
+    // Create or get a conversation between two users
+    ensureConversation(userA: string, userB: string) {
+      return withAuth((headers) =>
+        fetchJSON(`${DATA_BASE_URL}/api/messages/ensure`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ userA, userB }),
+        })
+      );
+    },
   },
 
   bounties: {
@@ -423,6 +433,14 @@ export const api = {
       return withAuth((headers) => {
         return fetchJSON(`${DATA_BASE_URL}/api/bounties/${bountyId}/claims`, {
           method: 'GET',
+          headers,
+        });
+      });
+    },
+    deleteClaim(bountyId: string, claimId: string) {
+      return withAuth((headers) => {
+        return fetchJSON(`${DATA_BASE_URL}/api/bounties/${bountyId}/claims/${claimId}`, {
+          method: 'DELETE',
           headers,
         });
       });

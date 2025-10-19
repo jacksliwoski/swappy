@@ -33,6 +33,16 @@ app.use('/api/bounties', require('./routes/bounties'));
 
 app.use((_req, res) => res.status(404).json({ ok: false, error: 'not_found' }));
 
-app.listen(config.port, () => {
-  console.log(`[swappy] listening on http://localhost:${config.port} (MOCK=${config.mock})`);
+const PORT = process.env.PORT ? Number(process.env.PORT) : 7003;
+
+const server = app.listen(PORT, () => {
+    console.log(`[Visa] server running at http://localhost:${PORT}`);
+});
+
+server.on('error', (err) => {
+    if (err && err.code === 'EADDRINUSE') {
+        console.error(`[Visa] Port ${PORT} already in use. Either free the port or set PORT environment variable (e.g. PORT=7003)`);
+        process.exit(1);
+    }
+    console.error('[Visa] Server error:', err);
 });

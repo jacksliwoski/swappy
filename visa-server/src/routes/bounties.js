@@ -9,6 +9,14 @@ const path = require('path');
 
 const router = express.Router();
 
+// Debugging: log incoming requests to claims routes to help trace 404s
+router.use((req, res, next) => {
+  if (req.path.includes('/claims') || req.path.includes('/send-payout')) {
+    console.log('[Bounties DBG] Incoming', req.method, req.originalUrl, 'user:', req.user ? req.user.id : 'anon');
+  }
+  next();
+});
+
 // File paths
 const bountiesFile = path.join(__dirname, '../../data/bounties.json');
 const claimsFile = path.join(__dirname, '../../data/claims.json');
@@ -142,46 +150,93 @@ router.get('/my', requireAuth, async (req, res) => {
 // GET /api/bounties/:id/claims - Get claims for a specific bounty
 router.get('/:id/claims', requireAuth, async (req, res) => {
   try {
-    const { id: bountyId } = req.params;
-    const currentUser = req.user;
+    const bountyId = req.params.id;
+    const currentUser = req.user || {};
+    const dataDir = path.resolve(__dirname, '..', '..', 'data');
+    const bountiesPath = path.join(dataDir, 'bounties.json');
+    const claimsPath = path.join(dataDir, 'claims.json');
+    const usersPath = path.join(dataDir, 'users.json');
 
-    // Get bounty
-    const bountiesDb = await readJson(bountiesFile);
-    const bounty = bountiesDb.bounties[bountyId] || bountiesDb.byId[bountyId] || bountiesDb.demo[bountyId];
+    const safeReadJson = async (p) => {
+      try {
+        const txt = await fs.readFile(p, 'utf8');
+        return JSON.parse(txt);
+      } catch (err) {
+        console.error(`[bounties] failed to read/parse ${p}:`, err && err.message);
+        return {};
+      }
+    };
 
-    if (!bounty) {
-      return res.status(404).json({ ok: false, error: 'Bounty not found' });
+    const bountiesDb = await safeReadJson(bountiesPath);
+    const claimsDb = await safeReadJson(claimsPath);
+    const usersDb = await safeReadJson(usersPath);
+
+    // find bounty across possible shapes
+    const bounty =
+      (bountiesDb.bounties && bountiesDb.bounties[bountyId]) ||
+      (bountiesDb.byId && bountiesDb.byId[bountyId]) ||
+      bountiesDb[bountyId] ||
+      null;
+
+    if (!bounty) return res.status(404).json({ ok: false, error: 'Bounty not found' });
+
+    // Allow owner OR monitoring/watch user to view claims
+    const isOwner = bounty.userId && currentUser.id && bounty.userId === currentUser.id;
+    const inMonitorLists =
+      (Array.isArray(bounty.watchers) && bounty.watchers.includes(currentUser.id)) ||
+      (Array.isArray(bounty.monitors) && bounty.monitors.includes(currentUser.id)) ||
+      (Array.isArray(bounty.monitoredBy) && bounty.monitoredBy.includes(currentUser.id)) ||
+      (Array.isArray(bounty.monitoring) && bounty.monitoring.includes && bounty.monitoring.includes(currentUser.id));
+
+    if (!isOwner && !inMonitorLists) {
+      // Still allow if server-side claim ownership implies access (edge-case)
+      // but default to forbidden
+      return res.status(403).json({ ok: false, error: 'Only bounty owner or monitor can view claims' });
     }
 
-    // Only bounty owner can see claims
-    if (bounty.userId !== currentUser.id) {
-      return res.status(403).json({ ok: false, error: 'Only bounty creator can view claims' });
+    // Collect claim IDs (prefer index, fallback to scanning)
+    let claimIds = [];
+    if (claimsDb.byBounty && Array.isArray(claimsDb.byBounty[bountyId]) && claimsDb.byBounty[bountyId].length) {
+      claimIds = claimsDb.byBounty[bountyId];
+    } else if (claimsDb.claims && typeof claimsDb.claims === 'object' && Object.keys(claimsDb.claims).length) {
+      claimIds = Object.keys(claimsDb.claims).filter(cid => {
+        const c = claimsDb.claims[cid];
+        return c && String(c.bountyId) === String(bountyId);
+      });
+    } else if (claimsDb.byId && typeof claimsDb.byId === 'object') {
+      claimIds = Object.keys(claimsDb.byId).filter(cid => {
+        const c = claimsDb.byId[cid];
+        return c && String(c.bountyId) === String(bountyId);
+      });
     }
 
-    // Get claims
-    const claimsDb = await readJson(claimsFile);
-    const claimIds = claimsDb.byBounty[bountyId] || [];
-    let claims = claimIds.map(id => claimsDb.claims[id] || claimsDb.byId[id]).filter(Boolean);
+    // Build claim objects
+    const claims = claimIds
+      .map(id => (claimsDb.claims && claimsDb.claims[id]) || (claimsDb.byId && claimsDb.byId[id]) || null)
+      .filter(Boolean);
 
-    // Enrich claims with claimer user data
-    for (const claim of claims) {
-      const claimer = await findUserById(claim.claimerId);
-      if (claimer) {
-        claim.claimer = {
-          id: claimer.id,
-          username: claimer.username,
-          avatar: claimer.avatar || '😊',
-          level: claimer.level || 1
+    // Enrich with claimer info when possible
+    const getUser = (uid) => {
+      if (!uid) return null;
+      return (usersDb.users && usersDb.users[uid]) || (usersDb.byId && usersDb.byId[uid]) || usersDb[uid] || null;
+    };
+
+    for (const c of claims) {
+      const u = getUser(c.claimerId);
+      if (u) {
+        c.claimer = {
+          id: u.id || u.username || c.claimerId,
+          username: u.username || u.id || c.claimerId,
+          avatar: u.avatar || null
         };
       }
     }
 
-    console.log('[Bounties API] Found', claims.length, 'claims for bounty:', bountyId);
-
-    res.json({ ok: true, claims });
-  } catch (error) {
-    console.error('[Bounties API] Error fetching claims:', error);
-    res.status(500).json({ ok: false, error: 'Failed to fetch claims' });
+    console.log(`[bounties] returning ${claims.length} claims for bounty ${bountyId}`);
+    return res.json({ ok: true, claims });
+  } catch (err) {
+    console.error('[bounties] error in /:id/claims:', err && err.stack ? err.stack : err);
+    return res.status(500).json({ ok: false, error: 'Failed to fetch claims' });
   }
 });
 
@@ -293,44 +348,42 @@ router.post('/', requireAuth, async (req, res) => {
     }
     db.byUser[currentUser.id].push(bountyId);
     
-    if (bounty.status === 'active') {
-      db.active.push(bountyId);
-    }
-    
     await writeJson(bountiesFile, db);
     
-    console.log('[Bounties API] Bounty created:', bountyId);
-    
-    res.json({ ok: true, bounty });
+    res.status(201).json({ ok: true, bounty });
   } catch (error) {
     console.error('[Bounties API] Error creating bounty:', error);
     res.status(500).json({ ok: false, error: 'Failed to create bounty' });
   }
 });
 
-// POST /api/bounties/:id/claim - Submit a claim
-router.post('/:id/claim', requireAuth, async (req, res) => {
+// POST /api/bounties/:id/claims - Create a claim for a bounty
+router.post('/:id/claims', requireAuth, async (req, res) => {
   try {
-    const { id: bountyId } = req.params;
+    const bountyId = req.params.id;
     const currentUser = req.user;
-    const claimData = req.body;
+    const { message, proof } = req.body;
     
-    console.log('[Bounties API] Submitting claim:', { bountyId, userId: currentUser.id });
+    console.log('[Bounties API] Creating claim for bounty:', bountyId, 'by user:', currentUser.id);
+    
+    // Validate request
+    if (!message || message.trim().length === 0) {
+      return res.status(400).json({ ok: false, error: 'Claim message is required' });
+    }
     
     // Get bounty
     const bountiesDb = await readJson(bountiesFile);
-    const bounty = bountiesDb.bounties[bountyId] || bountiesDb.demo[bountyId];
-    
+    const bounty = bountiesDb.bounties[bountyId] || bountiesDb.byId[bountyId] || bountiesDb.demo[bountyId];
+
     if (!bounty) {
       return res.status(404).json({ ok: false, error: 'Bounty not found' });
     }
-    
-    if (bounty.userId === currentUser.id) {
-      return res.status(400).json({ ok: false, error: 'Cannot claim your own bounty' });
-    }
-    
-    if (bounty.status !== 'active') {
-      return res.status(400).json({ ok: false, error: 'Bounty is not active' });
+
+    // Check if already claimed
+    const claimsDb = await readJson(claimsFile);
+    const userClaims = claimsDb.byUser[currentUser.id] || [];
+    if (userClaims.includes(bountyId)) {
+      return res.status(400).json({ ok: false, error: 'You have already claimed this bounty' });
     }
     
     // Create claim
@@ -341,34 +394,34 @@ router.post('/:id/claim', requireAuth, async (req, res) => {
       id: claimId,
       bountyId,
       claimerId: currentUser.id,
-      status: 'submitted',
-      proofOfPossession: claimData.proofOfPossession || {},
-      selectedRewardItems: claimData.selectedRewardItems || [],
-      verificationMethod: bounty.bountyType === 'treasure_hunt' ? 'location_proof' : 'photo_match',
-      verificationScore: null,
-      ownerConfirmed: false,
-      messages: [],
-      createdAt: now,
-      completedAt: null
+      message,
+      proof,
+      status: 'pending',
+      createdAt: now
     };
     
-    // For treasure hunts, auto-verify if location is valid
-    if (bounty.bountyType === 'treasure_hunt') {
-      // TODO: Add GPS verification logic
-      claim.verificationScore = 0.95; // High confidence for location match
-      claim.status = 'verified';
-    }
-    
     // Save claim
-    const claimsDb = await readJson(claimsFile);
+    if (!claimsDb.claims) {
+      claimsDb.claims = {};
+    }
     claimsDb.claims[claimId] = claim;
+    
+    if (!claimsDb.byId) {
+      claimsDb.byId = {};
+    }
     claimsDb.byId[claimId] = claim;
     
+    if (!claimsDb.byBounty) {
+      claimsDb.byBounty = {};
+    }
     if (!claimsDb.byBounty[bountyId]) {
       claimsDb.byBounty[bountyId] = [];
     }
     claimsDb.byBounty[bountyId].push(claimId);
     
+    if (!claimsDb.byUser) {
+      claimsDb.byUser = {};
+    }
     if (!claimsDb.byUser[currentUser.id]) {
       claimsDb.byUser[currentUser.id] = [];
     }
@@ -378,162 +431,242 @@ router.post('/:id/claim', requireAuth, async (req, res) => {
     
     // Update bounty claim count
     bounty.claimCount = (bounty.claimCount || 0) + 1;
-    if (bountiesDb.bounties[bountyId]) {
-      bountiesDb.bounties[bountyId].claimCount = bounty.claimCount;
-      await writeJson(bountiesFile, bountiesDb);
-    }
+    bountiesDb.bounties[bountyId] = bounty;
+    bountiesDb.byId[bountyId] = bounty;
     
-    console.log('[Bounties API] Claim submitted:', claimId);
+    await writeJson(bountiesFile, bountiesDb);
     
-    res.json({ ok: true, claim });
+    res.status(201).json({ ok: true, claim });
   } catch (error) {
-    console.error('[Bounties API] Error submitting claim:', error);
-    res.status(500).json({ ok: false, error: 'Failed to submit claim' });
+    console.error('[Bounties API] Error creating claim:', error);
+    res.status(500).json({ ok: false, error: 'Failed to create claim' });
   }
 });
 
-// POST /api/bounties/:id/verify - Verify and complete claim (owner only)
-router.post('/:id/verify', requireAuth, async (req, res) => {
+// DELETE /api/bounties/:id/claims/:claimId - Delete a claim (owner only)
+router.delete('/:id/claims/:claimId', requireAuth, async (req, res) => {
   try {
-    const { id: bountyId } = req.params;
+    const bountyId = req.params.id;
+    const claimId = req.params.claimId;
     const currentUser = req.user;
-    const { claimId, confirmed, rating, review } = req.body;
+
+    const bountiesDb = await readJson(bountiesFile);
+    const claimsDb = await readJson(claimsFile);
+
+    const bounty = bountiesDb.bounties[bountyId] || bountiesDb.byId[bountyId] || bountiesDb.demo[bountyId];
+    if (!bounty) return res.status(404).json({ ok: false, error: 'Bounty not found' });
+
+    if (bounty.userId !== currentUser.id) {
+      return res.status(403).json({ ok: false, error: 'Only the bounty creator can delete claims' });
+    }
+
+    // Remove claim from main map
+    if (claimsDb.claims && claimsDb.claims[claimId]) {
+      delete claimsDb.claims[claimId];
+    }
+    if (claimsDb.byId && claimsDb.byId[claimId]) {
+      delete claimsDb.byId[claimId];
+    }
+
+    // Remove from byBounty index
+    if (claimsDb.byBounty && Array.isArray(claimsDb.byBounty[bountyId])) {
+      claimsDb.byBounty[bountyId] = claimsDb.byBounty[bountyId].filter(id => id !== claimId);
+      if (claimsDb.byBounty[bountyId].length === 0) delete claimsDb.byBounty[bountyId];
+    }
+
+    // Remove from byUser index
+    if (claimsDb.byUser) {
+      for (const uid of Object.keys(claimsDb.byUser)) {
+        claimsDb.byUser[uid] = claimsDb.byUser[uid].filter(id => id !== claimId);
+        if (claimsDb.byUser[uid].length === 0) delete claimsDb.byUser[uid];
+      }
+    }
+
+    await writeJson(claimsFile, claimsDb);
+
+    // Decrement bounty claimCount where present
+    if (bountiesDb.bounties && bountiesDb.bounties[bountyId]) {
+      bountiesDb.bounties[bountyId].claimCount = Math.max(0, (bountiesDb.bounties[bountyId].claimCount || 1) - 1);
+      bountiesDb.byId[bountyId] = bountiesDb.bounties[bountyId];
+      await writeJson(bountiesFile, bountiesDb);
+    }
+
+    console.log('[Bounties API] Deleted claim', claimId, 'for bounty', bountyId);
+    return res.json({ ok: true, claimId });
+  } catch (err) {
+    console.error('[Bounties API] Error deleting claim:', err);
+    return res.status(500).json({ ok: false, error: 'Failed to delete claim' });
+  }
+});
+
+// POST /api/bounties/:id/award - Award a bounty to a user
+router.post('/:id/award', requireAuth, async (req, res) => {
+  try {
+    const bountyId = req.params.id;
+    const currentUser = req.user;
+    const { userId, amount, message } = req.body;
     
-    console.log('[Bounties API] Verifying claim:', { bountyId, claimId, confirmed });
+    console.log('[Bounties API] Awarding bounty:', bountyId, 'to user:', userId);
+    
+    // Validate request
+    if (!userId) {
+      return res.status(400).json({ ok: false, error: 'User ID is required' });
+    }
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ ok: false, error: 'Award amount must be positive' });
+    }
+    if (!message || message.trim().length === 0) {
+      return res.status(400).json({ ok: false, error: 'Award message is required' });
+    }
     
     // Get bounty
     const bountiesDb = await readJson(bountiesFile);
-    const bounty = bountiesDb.bounties[bountyId] || bountiesDb.demo[bountyId];
-    
+    const bounty = bountiesDb.bounties[bountyId] || bountiesDb.byId[bountyId] || bountiesDb.demo[bountyId];
+
     if (!bounty) {
       return res.status(404).json({ ok: false, error: 'Bounty not found' });
     }
-    
+
+    // Check if current user is the bounty creator
     if (bounty.userId !== currentUser.id) {
-      return res.status(403).json({ ok: false, error: 'Only bounty creator can verify' });
+      return res.status(403).json({ ok: false, error: 'Only the bounty creator can award the bounty' });
     }
     
-    // Get claim
-    const claimsDb = await readJson(claimsFile);
-    const claim = claimsDb.claims[claimId] || claimsDb.byId[claimId];
+    // Award logic (simplified)
+    const award = {
+      id: `award_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      bountyId,
+      userId,
+      amount,
+      message,
+      status: 'pending',
+      createdAt: new Date().toISOString()
+    };
     
-    if (!claim) {
-      return res.status(404).json({ ok: false, error: 'Claim not found' });
-    }
+    // Here you would integrate with payment or reward system
+    // For now, we just log it
+    console.log('[Bounties API] Award details (mock):', award);
     
-    if (!confirmed) {
-      // Rejected
-      claim.status = 'rejected';
-      claimsDb.claims[claimId] = claim;
-      await writeJson(claimsFile, claimsDb);
-      return res.json({ ok: true, claim });
-    }
-    
-    // Verified - process payout
-    claim.status = 'completed';
-    claim.ownerConfirmed = true;
-    claim.completedAt = new Date().toISOString();
-    claim.rating = rating;
-    claim.review = review;
-    
-    let payout = null;
-    
-    if (bounty.rewardType === 'monetary') {
-      // TODO: Get claimer's payment info
-      // For now, mock the payout
-      payout = await sendPayout({
-        recipientPAN: '4111111111111111', // Would come from claimer's profile
-        amount: bounty.monetaryReward.amount,
-        currency: bounty.monetaryReward.currency,
-        transactionId: claimId,
-        senderAccountNumber: process.env.PLATFORM_ACCOUNT_NUMBER
-      });
-      
-      // Save transaction
-      const transactionsDb = await readJson(transactionsFile);
-      const transactionId = `txn_${Date.now()}`;
-      transactionsDb.transactions[transactionId] = {
-        id: transactionId,
-        bountyId,
-        claimId,
-        type: 'payout',
-        amount: bounty.monetaryReward.amount,
-        currency: bounty.monetaryReward.currency,
-        visaTransactionId: payout.transactionId,
-        status: payout.status,
-        timestamp: payout.timestamp
-      };
-      await writeJson(transactionsFile, transactionsDb);
-    } else if (bounty.rewardType === 'inventory') {
-      // TODO: Transfer inventory items
-      console.log('[Bounties API] Inventory transfer:', claim.selectedRewardItems);
-    }
-    
-    // Update claim
-    claimsDb.claims[claimId] = claim;
-    await writeJson(claimsFile, claimsDb);
-    
-    // Update bounty status
-    bounty.status = 'completed';
-    if (bountiesDb.bounties[bountyId]) {
-      bountiesDb.bounties[bountyId].status = 'completed';
-      await writeJson(bountiesDb, bountiesDb);
-    }
-    
-    // Update bounty hunter stats
-    const huntersDb = await readJson(huntersFile);
-    let hunter = huntersDb.hunters[claim.claimerId] || huntersDb.byId[claim.claimerId];
-    
-    if (!hunter) {
-      hunter = {
-        userId: claim.claimerId,
-        stats: {
-          totalClaims: 0,
-          successfulReturns: 0,
-          successRate: 0,
-          totalEarnings: 0,
-          totalTradeValue: 0,
-          xpEarned: 0
-        },
-        badges: [],
-        perks: {},
-        rating: 0,
-        reviews: [],
-        joinedAt: new Date().toISOString()
-      };
-    }
-    
-    hunter.stats.totalClaims++;
-    hunter.stats.successfulReturns++;
-    hunter.stats.successRate = hunter.stats.successfulReturns / hunter.stats.totalClaims;
-    
-    if (bounty.rewardType === 'monetary') {
-      hunter.stats.totalEarnings += bounty.monetaryReward.amount;
-    }
-    
-    const xpReward = bounty.xpReward || (bounty.bountyType === 'treasure_hunt' ? 750 : 500);
-    hunter.stats.xpEarned += xpReward;
-    
-    huntersDb.hunters[claim.claimerId] = hunter;
-    huntersDb.byId[claim.claimerId] = hunter;
-    await writeJson(huntersFile, huntersDb);
-    
-    console.log('[Bounties API] Claim verified and payout processed');
-    
-    res.json({
-      ok: true,
-      claim,
-      payout,
-      xpAwarded: xpReward,
-      badgeProgress: {
-        current: hunter.stats.successfulReturns,
-        next: hunter.stats.successfulReturns < 5 ? 'bronze' : hunter.stats.successfulReturns < 15 ? 'silver' : 'gold',
-        remaining: hunter.stats.successfulReturns < 5 ? (5 - hunter.stats.successfulReturns) : hunter.stats.successfulReturns < 15 ? (15 - hunter.stats.successfulReturns) : (30 - hunter.stats.successfulReturns)
-      }
-    });
+    res.json({ ok: true, award });
   } catch (error) {
-    console.error('[Bounties API] Error verifying claim:', error);
-    res.status(500).json({ ok: false, error: 'Failed to verify claim' });
+    console.error('[Bounties API] Error awarding bounty:', error);
+    res.status(500).json({ ok: false, error: 'Failed to award bounty' });
+  }
+});
+
+// POST /api/bounties/:id/send-payout - Send payout for a bounty
+router.post('/:id/send-payout', requireAuth, async (req, res) => {
+  try {
+    const bountyId = req.params.id;
+    const currentUser = req.user;
+    
+    console.log('[Bounties API] Sending payout for bounty:', bountyId);
+    
+    // Get bounty
+    const bountiesDb = await readJson(bountiesFile);
+    const bounty = bountiesDb.bounties[bountyId] || bountiesDb.byId[bountyId] || bountiesDb.demo[bountyId];
+
+    if (!bounty) {
+      return res.status(404).json({ ok: false, error: 'Bounty not found' });
+    }
+
+    // Check if current user is the bounty creator
+    if (bounty.userId !== currentUser.id) {
+      return res.status(403).json({ ok: false, error: 'Only the bounty creator can send payout' });
+    }
+    
+    // Payout logic (simplified)
+    if (bounty.rewardType === 'monetary') {
+      // Integrate with payment system
+      const paymentResult = await sendPayout(bountyId, bounty.userId, bounty.monetaryReward.amount);
+      
+      console.log('[Bounties API] Payment result:', paymentResult);
+      
+      return res.json({ ok: true, payout: paymentResult });
+    } else {
+      return res.status(400).json({ ok: false, error: 'Payout not supported for non-monetary bounties' });
+    }
+  } catch (error) {
+    console.error('[Bounties API] Error sending payout:', error);
+    res.status(500).json({ ok: false, error: 'Failed to send payout' });
+  }
+});
+
+// POST /api/bounties/:id/verify-identity - Verify user identity for a bounty
+router.post('/:id/verify-identity', requireAuth, async (req, res) => {
+  try {
+    const bountyId = req.params.id;
+    const currentUser = req.user;
+    const { name, idNumber, document } = req.body;
+    
+    console.log('[Bounties API] Verifying identity for bounty:', bountyId);
+    
+    // Validate request
+    if (!name || !idNumber || !document) {
+      return res.status(400).json({ ok: false, error: 'Name, ID number, and document are required' });
+    }
+    
+    // Get bounty
+    const bountiesDb = await readJson(bountiesFile);
+    const bounty = bountiesDb.bounties[bountyId] || bountiesDb.byId[bountyId] || bountiesDb.demo[bountyId];
+
+    if (!bounty) {
+      return res.status(404).json({ ok: false, error: 'Bounty not found' });
+    }
+
+    // Check if current user is the bounty creator
+    if (bounty.userId !== currentUser.id) {
+      return res.status(403).json({ ok: false, error: 'Only the bounty creator can verify identity' });
+    }
+    
+    // Identity verification logic (mock)
+    const verificationResult = await verifyUserIdentity(name, idNumber, document);
+    
+    console.log('[Bounties API] Identity verification result:', verificationResult);
+    
+    res.json({ ok: true, verification: verificationResult });
+  } catch (error) {
+    console.error('[Bounties API] Error verifying identity:', error);
+    res.status(500).json({ ok: false, error: 'Failed to verify identity' });
+  }
+});
+
+// POST /api/bounties/:id/fraud-check - Perform fraud check for a bounty
+router.post('/:id/fraud-check', requireAuth, async (req, res) => {
+  try {
+    const bountyId = req.params.id;
+    const currentUser = req.user;
+    const { transactionId } = req.body;
+    
+    console.log('[Bounties API] Performing fraud check for bounty:', bountyId);
+    
+    // Validate request
+    if (!transactionId) {
+      return res.status(400).json({ ok: false, error: 'Transaction ID is required' });
+    }
+    
+    // Get bounty
+    const bountiesDb = await readJson(bountiesFile);
+    const bounty = bountiesDb.bounties[bountyId] || bountiesDb.byId[bountyId] || bountiesDb.demo[bountyId];
+
+    if (!bounty) {
+      return res.status(404).json({ ok: false, error: 'Bounty not found' });
+    }
+
+    // Check if current user is the bounty creator
+    if (bounty.userId !== currentUser.id) {
+      return res.status(403).json({ ok: false, error: 'Only the bounty creator can perform fraud check' });
+    }
+    
+    // Fraud check logic (mock)
+    const fraudCheckResult = await performFraudCheck(transactionId);
+    
+    console.log('[Bounties API] Fraud check result:', fraudCheckResult);
+    
+    res.json({ ok: true, fraudCheck: fraudCheckResult });
+  } catch (error) {
+    console.error('[Bounties API] Error performing fraud check:', error);
+    res.status(500).json({ ok: false, error: 'Failed to perform fraud check' });
   }
 });
 

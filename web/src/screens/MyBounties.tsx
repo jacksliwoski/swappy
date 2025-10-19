@@ -120,6 +120,49 @@ export default function MyBounties() {
     }
   }
 
+  async function handleOpenChat(claim: Claim) {
+    if (!claim.claimer) return;
+    try {
+      // Ensure conversation exists between current user (me) and claimer
+      const meRes = await api.auth.me();
+      if (!meRes.ok || !meRes.user) return;
+      const myId = meRes.user.id;
+
+      const ensure = await api.messages.ensureConversation(myId, claim.claimer.id);
+      const convId = ensure.conversationId || ensure.id || ensure.convId;
+      if (convId) {
+        // Navigate to messages screen for that conversation
+        navigate(`/messages/${convId}`);
+      } else {
+        console.warn('No conversation id returned from ensureConversation', ensure);
+      }
+    } catch (err) {
+      console.error('Failed to open chat:', err);
+    }
+  }
+
+  async function handleCloseClaim(claim: Claim) {
+    if (!selectedBounty) return;
+    if (!confirm('Delete this claim? This cannot be undone.')) return;
+    setProcessing(true);
+    try {
+      const res = await api.bounties.deleteClaim(selectedBounty.id, claim.id);
+      if (res.ok) {
+        alert('Claim deleted');
+        // refresh claims
+        const result = await api.bounties.getClaims(selectedBounty.id);
+        setClaims(result.claims || []);
+        loadMyBounties();
+      } else {
+        alert('Failed to delete claim: ' + (res.error || 'unknown'));
+      }
+    } catch (err: any) {
+      alert('Failed to delete claim: ' + err.message);
+    } finally {
+      setProcessing(false);
+    }
+  }
+
   const containerStyles: CSSProperties = {
     maxWidth: 'var(--container-max)',
     margin: '0 auto',
@@ -473,26 +516,25 @@ export default function MyBounties() {
                   </div>
 
                   {/* Action Buttons */}
-                  {claim.status === 'pending' && (
-                    <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
-                      <Button
-                        onClick={() => handleVerifyClaim(claim, true)}
-                        variant="primary"
-                        disabled={processing}
-                        style={{ flex: 1 }}
-                      >
-                        {processing ? 'Processing...' : `✅ Approve & Send $${selectedBounty.monetaryReward?.amount}`}
-                      </Button>
-                      <Button
-                        onClick={() => handleVerifyClaim(claim, false)}
-                        variant="secondary"
-                        disabled={processing}
-                        style={{ flex: 1 }}
-                      >
-                        ❌ Reject
-                      </Button>
-                    </div>
-                  )}
+                  <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
+                    <Button
+                      onClick={() => handleOpenChat(claim)}
+                      variant="primary"
+                      disabled={processing}
+                      style={{ flex: 1 }}
+                    >
+                      💬 Open
+                    </Button>
+
+                    <Button
+                      onClick={() => handleCloseClaim(claim)}
+                      variant="secondary"
+                      disabled={processing}
+                      style={{ flex: 1 }}
+                    >
+                      🗑️ Close
+                    </Button>
+                  </div>
                 </div>
               ))
             )}
