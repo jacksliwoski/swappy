@@ -1,33 +1,89 @@
 const express = require('express');
+const { store } = require('../db/memory');
+const { requireAuth } = require('../middleware/auth');
+const { findUserById } = require('../db/filedb');
 const router = express.Router();
 
-// Mock messages store
-const mockConversations = {};
-const mockMessages = {};
-
 // GET /api/messages/:userId - Get user's conversations
-router.get('/:userId', (req, res) => {
+router.get('/:userId', requireAuth, async (req, res) => {
   const { userId } = req.params;
+  
+  console.log('[Messages API] Getting conversations for user:', userId);
+  console.log('[Messages API] store.messages exists:', !!store.messages);
+  console.log('[Messages API] store.messages size:', store.messages ? store.messages.size : 0);
 
-  // Return mock conversations
-  const conversations = [
-    {
-      id: 'conv-1',
-      participants: [
-        { id: userId, username: 'You', avatar: '😊', level: 1 },
-        { id: 'user-2', username: 'ToyTrader99', avatar: '🚀', level: 3 },
-      ],
-      lastMessage: {
-        id: 'msg-1',
-        text: 'Want to trade for my LEGO set?',
-        sentAt: new Date().toISOString(),
-        fromUserId: 'user-2',
-      },
-      unreadCount: 1,
-    },
-  ];
+  if (!store.messages) {
+    console.log('[Messages API] No messages store, returning empty');
+    return res.json({ ok: true, conversations: [] });
+  }
+
+  // Get all messages for this user
+  const userMessages = Array.from(store.messages.values())
+    .filter(msg => msg.fromUserId === userId || msg.toUserId === userId)
+    .sort((a, b) => new Date(b.sentAt) - new Date(a.sentAt));
+
+  console.log('[Messages API] Found', userMessages.length, 'messages for user');
+
+  // Group by conversation
+  const conversationsMap = new Map();
+
+  // Fetch current user data
+  const currentUser = await findUserById(userId);
+  const currentUserData = {
+    id: userId,
+    username: currentUser?.username || 'User',
+    avatar: currentUser?.avatar || '😊',
+    level: currentUser?.level || 1,
+  };
+
+  for (const msg of userMessages) {
+    const convId = msg.conversationId;
+    
+    if (!conversationsMap.has(convId)) {
+      const otherUserId = msg.fromUserId === userId ? msg.toUserId : msg.fromUserId;
+      
+      // Fetch other user data
+      const otherUserData = await findUserById(otherUserId);
+      const otherUser = {
+        id: otherUserId,
+        username: otherUserData?.username || (otherUserId === 'u_demo_2' ? 'Anderson' : 'User'),
+        avatar: otherUserData?.avatar || (otherUserId === 'u_demo_2' ? '🎮' : '😊'),
+        level: otherUserData?.level || 1,
+      };
+      
+      conversationsMap.set(convId, {
+        id: convId,
+        participants: [
+          currentUserData,
+          otherUser,
+        ],
+        lastMessage: msg,
+        unreadCount: 0,
+      });
+    }
+  }
+
+  const conversations = Array.from(conversationsMap.values());
+  
+  console.log('[Messages API] Returning', conversations.length, 'conversations');
 
   res.json({ ok: true, conversations });
+});
+
+// GET /api/messages/:userId/:conversationId - Get messages for a conversation
+router.get('/:userId/:conversationId', requireAuth, (req, res) => {
+  const { userId, conversationId } = req.params;
+
+  if (!store.messages) {
+    return res.json({ ok: true, messages: [] });
+  }
+
+  // Get all messages for this conversation
+  const messages = Array.from(store.messages.values())
+    .filter(msg => msg.conversationId === conversationId)
+    .sort((a, b) => new Date(a.sentAt) - new Date(b.sentAt));
+
+  res.json({ ok: true, messages });
 });
 
 // POST /api/messages - Send a message

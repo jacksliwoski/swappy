@@ -38,11 +38,24 @@ export default function Messages() {
     });
   }, []);
 
+  // Reload conversations when route conversation ID changes
   useEffect(() => {
-    if (selectedConvId) {
+    if (paramConversationId && currentUser && conversations.length === 0) {
+      console.log('[Messages] Route param changed, reloading for conversation:', paramConversationId);
+      loadConversations(currentUser.id).then(() => {
+        setSelectedConvId(paramConversationId);
+      });
+    } else if (paramConversationId && conversations.length > 0) {
+      console.log('[Messages] Setting selected conversation from route:', paramConversationId);
+      setSelectedConvId(paramConversationId);
+    }
+  }, [paramConversationId, currentUser]);
+
+  useEffect(() => {
+    if (selectedConvId && currentUser) {
       loadMessages(selectedConvId);
     }
-  }, [selectedConvId]);
+  }, [selectedConvId, currentUser]);
 
   useEffect(() => {
     scrollToBottom();
@@ -52,7 +65,7 @@ export default function Messages() {
   useEffect(() => {
     if (newMessage || messages.length > 0) {
       const hasIntent = detectMeetupIntent(newMessage) || 
-        messages.some(msg => detectMeetupIntent(msg.text));
+        messages.filter(msg => msg.text).some(msg => detectMeetupIntent(msg.text));
       const hasUnsafe = detectUnsafeBehavior(newMessage);
 
       if (hasUnsafe) {
@@ -74,28 +87,49 @@ export default function Messages() {
   async function loadConversations(userId: string) {
     setLoading(true);
     try {
+      console.log('[Messages] Loading conversations for user:', userId);
       const data = await api.messages.getConversations(userId);
-      setConversations(data.conversations || []);
+      console.log('[Messages] Received conversations RAW:', data);
+      console.log('[Messages] Type of data:', typeof data);
+      console.log('[Messages] Keys in data:', Object.keys(data || {}));
+      console.log('[Messages] data.conversations:', data?.conversations);
+      console.log('[Messages] Conversations array:', data?.conversations);
+      console.log('[Messages] Conversations count:', data?.conversations?.length || 0);
       
-      if (!selectedConvId && data.conversations?.length > 0) {
+      if (data && data.conversations) {
+        setConversations(data.conversations);
+      } else {
+        console.error('[Messages] Invalid response format:', data);
+        console.error('[Messages] Expected { ok: true, conversations: [...] }');
+        setConversations([]);
+      }
+      
+      if (!selectedConvId && !paramConversationId && data?.conversations?.length > 0) {
         setSelectedConvId(data.conversations[0].id);
       }
+      
+      return data;
     } catch (error) {
-      console.error('Failed to load conversations:', error);
+      console.error('[Messages] Failed to load conversations:', error);
+      return { conversations: [] };
     } finally {
       setLoading(false);
     }
   }
 
   async function loadMessages(convId: string) {
+    if (!currentUser) return;
+    
     try {
-      const conv = conversations.find(c => c.id === convId);
-      if (conv && conv.lastMessage) {
-        // Mock: In a real app, fetch full message history
-        setMessages([conv.lastMessage]);
-      }
+      const data = await api.messages.getMessages(currentUser.id, convId);
+      setMessages(data.messages || []);
     } catch (error) {
       console.error('Failed to load messages:', error);
+      // Fallback to lastMessage from conversation
+      const conv = conversations.find(c => c.id === convId);
+      if (conv && conv.lastMessage) {
+        setMessages([conv.lastMessage]);
+      }
     }
   }
 
@@ -197,9 +231,10 @@ export default function Messages() {
 
     try {
       await api.trades.accept(tradeId);
-      // Reload messages to show updated status
-      if (selectedConvId) {
-        loadMessages(selectedConvId);
+      // Reload both conversations and messages to show updated status
+      if (currentUser && selectedConvId) {
+        await loadConversations(currentUser.id);
+        await loadMessages(selectedConvId);
       }
       alert('Trade accepted! You can now plan your meetup.');
     } catch (error) {
@@ -215,9 +250,10 @@ export default function Messages() {
 
     try {
       await api.trades.decline(tradeId);
-      // Reload messages to show updated status
-      if (selectedConvId) {
-        loadMessages(selectedConvId);
+      // Reload both conversations and messages to show updated status
+      if (currentUser && selectedConvId) {
+        await loadConversations(currentUser.id);
+        await loadMessages(selectedConvId);
       }
     } catch (error) {
       console.error('Failed to decline trade:', error);
@@ -245,12 +281,18 @@ export default function Messages() {
         <p style={{ fontSize: 'var(--text-xl)', color: 'var(--color-gray-600)', marginBottom: 'var(--space-6)' }}>
           No messages yet. Start trading to connect with others!
         </p>
+        <Button 
+          variant="primary" 
+          onClick={() => currentUser && loadConversations(currentUser.id)}
+        >
+          🔄 Reload Messages
+        </Button>
       </div>
     );
   }
 
   const selectedConv = conversations.find(c => c.id === selectedConvId);
-  const otherUser = selectedConv?.participants.find(p => p.id !== 'user-1');
+  const otherUser = selectedConv?.participants.find(p => p.id !== currentUser?.id);
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', height: 'calc(100vh - 80px)' }}>
@@ -265,7 +307,7 @@ export default function Messages() {
         </div>
         
         {conversations.map(conv => {
-          const otherParticipant = conv.participants.find(p => p.id !== 'user-1');
+          const otherParticipant = conv.participants.find(p => p.id !== currentUser?.id);
           if (!otherParticipant) return null;
 
           return (

@@ -75,9 +75,10 @@ router.post('/propose', requireAuth, (req, res) => {
 
   // Create a message notification for the recipient
   const messageId = 'msg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  const conversationId = [trade.fromUserId, trade.toUserId].sort().join('_');
   const message = {
     id: messageId,
-    conversationId: [trade.fromUserId, trade.toUserId].sort().join('_'),
+    conversationId,
     fromUserId: trade.fromUserId,
     toUserId: trade.toUserId,
     text: null,
@@ -92,8 +93,17 @@ router.post('/propose', requireAuth, (req, res) => {
     store.messages = new Map();
   }
   store.messages.set(messageId, message);
+  
+  console.log('[Trades API] Created trade offer message:', {
+    messageId,
+    conversationId,
+    fromUserId: trade.fromUserId,
+    toUserId: trade.toUserId,
+    tradeId,
+  });
+  console.log('[Trades API] Total messages in store:', store.messages.size);
 
-  res.json({ ok: true, tradeId, trade: tradeOffer });
+  res.json({ ok: true, tradeId, trade: tradeOffer, conversationId });
 });
 
 // GET TRADES FOR A USER
@@ -149,6 +159,18 @@ router.put('/:id/accept', requireAuth, (req, res) => {
   trade.respondedAt = new Date().toISOString();
   store.tradeOffers.set(id, trade);
 
+  // Update the original trade offer message with new status
+  if (store.messages) {
+    for (const [msgId, msg] of store.messages.entries()) {
+      if (msg.tradeOffer && msg.tradeOffer.trade.id === id) {
+        msg.tradeOffer.trade.status = 'accepted';
+        msg.tradeOffer.trade.respondedAt = trade.respondedAt;
+        store.messages.set(msgId, msg);
+        break;
+      }
+    }
+  }
+
   // Award XP to both users
   const XP_FOR_TRADE = 50;
   addXp(trade.fromUserId, XP_FOR_TRADE);
@@ -192,6 +214,18 @@ router.put('/:id/decline', requireAuth, (req, res) => {
   trade.respondedAt = new Date().toISOString();
   store.tradeOffers.set(id, trade);
 
+  // Update the original trade offer message with new status
+  if (store.messages) {
+    for (const [msgId, msg] of store.messages.entries()) {
+      if (msg.tradeOffer && msg.tradeOffer.trade.id === id) {
+        msg.tradeOffer.trade.status = 'declined';
+        msg.tradeOffer.trade.respondedAt = trade.respondedAt;
+        store.messages.set(msgId, msg);
+        break;
+      }
+    }
+  }
+
   // Create decline message
   const messageId = 'msg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
   const message = {
@@ -231,12 +265,24 @@ router.post('/:id/counter', requireAuth, (req, res) => {
   originalTrade.respondedAt = new Date().toISOString();
   store.tradeOffers.set(id, originalTrade);
 
+  // Update the original trade offer message with new status
+  if (store.messages) {
+    for (const [msgId, msg] of store.messages.entries()) {
+      if (msg.tradeOffer && msg.tradeOffer.trade.id === id) {
+        msg.tradeOffer.trade.status = 'countered';
+        msg.tradeOffer.trade.respondedAt = originalTrade.respondedAt;
+        store.messages.set(msgId, msg);
+        break;
+      }
+    }
+  }
+
   // Create new counter offer
   const counterTradeId = 'trade_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
   const counterTrade = {
     ...counterOffer,
     id: counterTradeId,
-    status: 'countered',
+    status: 'proposed',
     counterOfferTo: id,
     proposedAt: new Date().toISOString(),
   };

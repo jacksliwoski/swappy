@@ -25,6 +25,8 @@ app.get('/api/health', (_req, res) => res.json({ ok: true, ts: Date.now(), mock:
 // routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
+app.use('/api/trades', require('./routes/trades'));
+app.use('/api/messages', require('./routes/messages'));
 
 app.use((_req, res) => res.status(404).json({ ok: false, error: 'not_found' }));
 

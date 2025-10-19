@@ -27,7 +27,9 @@ const MEETUP_KEYWORDS = [
 /**
  * Check if a message contains meetup intent
  */
-export function detectMeetupIntent(message: string): boolean {
+export function detectMeetupIntent(message: string | null | undefined): boolean {
+  if (!message) return false;
+  
   const lowerMessage = message.toLowerCase();
 
   return MEETUP_KEYWORDS.some(keyword => lowerMessage.includes(keyword));
@@ -46,7 +48,9 @@ export function detectMeetupIntentInMessages(messages: Array<{ text: string }>):
 /**
  * Check for deposit/off-app mentions (safety concern)
  */
-export function detectUnsafeBehavior(message: string): boolean {
+export function detectUnsafeBehavior(message: string | null | undefined): boolean {
+  if (!message) return false;
+  
   const lowerMessage = message.toLowerCase();
 
   const unsafeKeywords = [

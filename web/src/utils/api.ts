@@ -55,12 +55,24 @@ export function setToken(t: string) { try { localStorage.setItem(tokenKey, t); }
 export function getToken(): string | null { try { return localStorage.getItem(tokenKey); } catch { return null; } }
 export function clearToken() { try { localStorage.removeItem(tokenKey); } catch {} }
 
-function withAuth(init: RequestInit = {}): RequestInit {
+// Overloaded withAuth - supports both callback and direct usage
+function withAuth<T>(callback: (headers: Headers) => Promise<T>): Promise<T>;
+function withAuth(init?: RequestInit): RequestInit;
+function withAuth<T>(param?: RequestInit | ((headers: Headers) => Promise<T>)): RequestInit | Promise<T> {
   const t = getToken();
-  if (!t) return init;
-  const headers = new Headers(init.headers || {});
-  headers.set('authorization', `Bearer ${t}`);
-  return { ...init, headers };
+  const headers = new Headers();
+  if (t) {
+    headers.set('authorization', `Bearer ${t}`);
+  }
+  
+  // If param is a function (callback pattern), call it with headers
+  if (typeof param === 'function') {
+    return param(headers);
+  }
+  
+  // Otherwise, return RequestInit with auth headers
+  const init = param || {};
+  return { ...init, headers: new Headers({ ...Object.fromEntries(headers), ...(init.headers || {}) }) };
 }
 
 export const ai = {
@@ -214,7 +226,7 @@ export const api = {
     },
     propose(trade: any) {
       return withAuth((headers) =>
-        fetchJSON(`${DATA_API}/api/trades/propose`, {
+        fetchJSON(`${DATA_BASE_URL}/api/trades/propose`, {
           method: 'POST',
           headers,
           body: JSON.stringify(trade),
@@ -223,7 +235,7 @@ export const api = {
     },
     accept(tradeId: string) {
       return withAuth((headers) =>
-        fetchJSON(`${DATA_API}/api/trades/${tradeId}/accept`, {
+        fetchJSON(`${DATA_BASE_URL}/api/trades/${tradeId}/accept`, {
           method: 'PUT',
           headers,
         })
@@ -231,7 +243,7 @@ export const api = {
     },
     decline(tradeId: string) {
       return withAuth((headers) =>
-        fetchJSON(`${DATA_API}/api/trades/${tradeId}/decline`, {
+        fetchJSON(`${DATA_BASE_URL}/api/trades/${tradeId}/decline`, {
           method: 'PUT',
           headers,
         })
@@ -239,7 +251,7 @@ export const api = {
     },
     counter(tradeId: string, counterOffer: any) {
       return withAuth((headers) =>
-        fetchJSON(`${DATA_API}/api/trades/${tradeId}/counter`, {
+        fetchJSON(`${DATA_BASE_URL}/api/trades/${tradeId}/counter`, {
           method: 'POST',
           headers,
           body: JSON.stringify(counterOffer),
@@ -248,7 +260,7 @@ export const api = {
     },
     getAll(userId: string) {
       return withAuth((headers) =>
-        fetchJSON(`${DATA_API}/api/trades?userId=${userId}`, {
+        fetchJSON(`${DATA_BASE_URL}/api/trades?userId=${userId}`, {
           method: 'GET',
           headers,
         })
@@ -256,7 +268,7 @@ export const api = {
     },
     get(tradeId: string) {
       return withAuth((headers) =>
-        fetchJSON(`${DATA_API}/api/trades/${tradeId}`, {
+        fetchJSON(`${DATA_BASE_URL}/api/trades/${tradeId}`, {
           method: 'GET',
           headers,
         })
@@ -266,12 +278,34 @@ export const api = {
 
   messages: {
     getConversations(userId: string) {
-      // Mock for now
-      return Promise.resolve({ conversations: [] });
+      return withAuth((headers) =>
+        fetchJSON(`${DATA_BASE_URL}/api/messages/${userId}`, {
+          method: 'GET',
+          headers,
+        })
+      );
+    },
+    getMessages(userId: string, conversationId: string) {
+      return withAuth((headers) =>
+        fetchJSON(`${DATA_BASE_URL}/api/messages/${userId}/${conversationId}`, {
+          method: 'GET',
+          headers,
+        })
+      );
     },
     send(convId: string, fromId: string, toId: string, text: string) {
-      // Mock for now
-      return Promise.resolve({ ok: true });
+      return withAuth((headers) =>
+        fetchJSON(`${DATA_BASE_URL}/api/messages`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            conversationId: convId,
+            fromUserId: fromId,
+            toUserId: toId,
+            text,
+          }),
+        })
+      );
     },
   },
 };

@@ -338,13 +338,18 @@ export default function TradeBuilder() {
         status: 'proposed' as const,
       };
 
-      await api.trades.propose(tradeOffer);
+      const result = await api.trades.propose(tradeOffer);
+      console.log('[TradeBuilder] Trade offer sent successfully:', result);
 
       addEvent('confirmed', 'Trade offer sent!');
       setShowConfetti(true);
+      
+      // Navigate to messages with the conversation ID
+      const conversationId = [myUser.id, theirUser.id].sort().join('_');
+      console.log('[TradeBuilder] Navigating to conversation:', conversationId);
       setTimeout(() => {
-        navigate('/messages');
-      }, 2000);
+        navigate(`/messages/${conversationId}`);
+      }, 1500);
     } catch (error) {
       console.error('Failed to send trade offer:', error);
       alert('Failed to send trade offer. Please try again.');
