@@ -140,45 +140,71 @@ export default function Messages() {
     setModerationWarning(null);
 
     try {
-      // AI Moderation is temporarily disabled
-      // Uncomment below to re-enable when AI server is available
-      
-      /* 
+      // AI Moderation enabled - checks messages for safety issues
       try {
-        const response = await ai.moderateStream(newMessage);
+        // Prepare chat history for context (last 10 messages)
+        const chatHistory = messages
+          .filter(m => m.text) // Only text messages, not trade offers
+          .slice(-10)
+          .map(m => ({
+            text: m.text || '',
+            fromMe: m.fromUserId === currentUser?.id
+          }));
+        
+        const response = await ai.moderateStream(newMessage, chatHistory);
         const reader = response.body?.getReader();
         const decoder = new TextDecoder();
-        let fullResult = '';
+        let moderationResult: ModerationResult | null = null;
 
         if (reader) {
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
+            
             const chunk = decoder.decode(value);
             const lines = chunk.split('\n');
+            
             for (const line of lines) {
               if (line.startsWith('data: ')) {
-                fullResult += line.slice(6);
+                const data = line.slice(6).trim();
+                
+                // Skip [DONE] marker
+                if (data === '[DONE]') continue;
+                
+                try {
+                  const parsed = JSON.parse(data);
+                  
+                  // Only keep the final moderation result (has action, tags, tip)
+                  if (parsed.action && parsed.tags && parsed.tip) {
+                    moderationResult = parsed;
+                  }
+                } catch (e) {
+                  // Skip invalid JSON chunks
+                  continue;
+                }
               }
             }
           }
 
-          const moderationResult: ModerationResult = JSON.parse(fullResult);
-          
-          if (moderationResult.action === 'block') {
-            setModerationWarning(moderationResult);
-            setSending(false);
-            return;
-          }
+          // Apply moderation result if we got one
+          if (moderationResult) {
+            console.log('[Messages] Moderation result:', moderationResult);
+            
+            if (moderationResult.action === 'block') {
+              setModerationWarning(moderationResult);
+              setSending(false);
+              return;
+            }
 
-          if (moderationResult.action === 'warn') {
-            setModerationWarning(moderationResult);
+            if (moderationResult.action === 'warn') {
+              setModerationWarning(moderationResult);
+            }
           }
         }
       } catch (moderationError) {
         console.warn('Moderation check failed, proceeding with message send:', moderationError);
+        // Continue sending the message even if moderation fails
       }
-      */
 
       // Send message
       const conv = conversations.find(c => c.id === selectedConvId);
@@ -458,9 +484,37 @@ export default function Messages() {
               <div style={{ padding: '0 var(--space-4) var(--space-2)' }}>
                 <SafetyBanner
                   type={moderationWarning.action === 'block' ? 'error' : 'warning'}
-                  message={moderationWarning.tip}
-                  tags={moderationWarning.tags}
-                />
+                  icon="⚠️"
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 'var(--font-bold)', marginBottom: 'var(--space-2)' }}>
+                        Safety Warning
+                      </div>
+                      <div style={{ marginBottom: 'var(--space-2)' }}>
+                        {moderationWarning.tip}
+                      </div>
+                      <div style={{ fontSize: 'var(--text-small)', opacity: 0.8 }}>
+                        Tags: {moderationWarning.tags.join(', ')}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setModerationWarning(null)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        fontSize: 'var(--text-xl)',
+                        cursor: 'pointer',
+                        padding: 'var(--space-1)',
+                        marginLeft: 'var(--space-2)',
+                        opacity: 0.6,
+                      }}
+                      aria-label="Dismiss warning"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </SafetyBanner>
               </div>
             )}
 

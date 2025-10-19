@@ -88,8 +88,14 @@ export const ai = {
       body: JSON.stringify({ sideA: myValues, sideB: theirValues })
     });
   },
-  moderateStream(msg: string) {
-    return fetch(`${AI_BASE_URL}/ai/moderate/stream?msg=${encodeURIComponent(msg)}`);
+  moderateStream(msg: string, chatHistory?: Array<{ text: string; fromMe: boolean }>) {
+    let url = `${AI_BASE_URL}/ai/moderate/stream?msg=${encodeURIComponent(msg)}`;
+    if (chatHistory && chatHistory.length > 0) {
+      // Send last 10 messages for context
+      const recentHistory = chatHistory.slice(-10);
+      url += `&chatHistory=${encodeURIComponent(JSON.stringify(recentHistory))}`;
+    }
+    return fetch(url);
   },
   visionFacts(imagesBase64: string[], description?: string) {
     return fetchJSON<any>(`${AI_BASE_URL}/ai/vision-facts`, {
