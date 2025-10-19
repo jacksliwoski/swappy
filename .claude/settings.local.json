@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm init -y)",
+      "Bash(netstat -ano)",
+      "Bash(findstr \":5173\")",
+      "Bash(ipconfig)",
+      "Bash(findstr \"IPv4\")",
+      "Bash(findstr \":3000\")",
+      "Bash(test -d web/node_modules)",
+      "Bash(npm install --save-dev tsx)",
+      "Bash(npm install @google/generative-ai@latest)",
+      "Bash(npm install @googlemaps/google-maps-services-js)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
