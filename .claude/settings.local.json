@@ -35,7 +35,9 @@
       "Bash(npm start)",
       "Bash(taskkill //PID 17780 //F)",
       "Bash(timeout /t 2 /nobreak)",
-      "Bash(findstr :5173)"
+      "Bash(findstr :5173)",
+      "Bash(cat bounties.json)",
+      "Bash(taskkill //PID 29608 //F)"
     ],
     "deny": [],
     "ask": []

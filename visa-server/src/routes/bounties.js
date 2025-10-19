@@ -119,6 +119,26 @@ router.get('/', requireAuth, async (req, res) => {
   }
 });
 
+// GET /api/bounties/my - Get user's posted bounties
+router.get('/my', requireAuth, async (req, res) => {
+  try {
+    const currentUser = req.user;
+    console.log('[Bounties API] Fetching user bounties for:', currentUser.id);
+
+    const db = await readJson(bountiesFile);
+
+    const userBountyIds = db.byUser[currentUser.id] || [];
+    const bounties = userBountyIds.map(id => db.bounties[id] || db.byId[id]).filter(Boolean);
+
+    console.log('[Bounties API] Found', bounties.length, 'bounties for user:', currentUser.id);
+
+    res.json({ ok: true, bounties });
+  } catch (error) {
+    console.error('[Bounties API] Error fetching user bounties:', error);
+    res.status(500).json({ ok: false, error: 'Failed to fetch bounties' });
+  }
+});
+
 // GET /api/bounties/:id - Get specific bounty
 router.get('/:id', requireAuth, async (req, res) => {
   try {
@@ -468,22 +488,6 @@ router.post('/:id/verify', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('[Bounties API] Error verifying claim:', error);
     res.status(500).json({ ok: false, error: 'Failed to verify claim' });
-  }
-});
-
-// GET /api/bounties/my - Get user's posted bounties
-router.get('/my', requireAuth, async (req, res) => {
-  try {
-    const currentUser = req.user;
-    const db = await readJson(bountiesFile);
-    
-    const userBountyIds = db.byUser[currentUser.id] || [];
-    const bounties = userBountyIds.map(id => db.bounties[id] || db.byId[id]).filter(Boolean);
-    
-    res.json({ ok: true, bounties });
-  } catch (error) {
-    console.error('[Bounties API] Error fetching user bounties:', error);
-    res.status(500).json({ ok: false, error: 'Failed to fetch bounties' });
   }
 });
 
