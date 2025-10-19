@@ -23,6 +23,28 @@ export default function ItemCard({
 }: ItemCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  const hasMultipleImages = item.images && item.images.length > 1;
+  
+  const handlePrevImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentImageIndex((prev) => 
+      prev === 0 ? (item.images?.length || 1) - 1 : prev - 1
+    );
+    setImageLoaded(false);
+    setImageError(false);
+  };
+
+  const handleNextImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentImageIndex((prev) => 
+      prev === (item.images?.length || 1) - 1 ? 0 : prev + 1
+    );
+    setImageLoaded(false);
+    setImageError(false);
+  };
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -124,6 +146,45 @@ export default function ItemCard({
     animation: 'scaleIn 0.2s ease-out',
   };
 
+  const imageNavButtonStyles: CSSProperties = {
+    position: 'absolute',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    width: '32px',
+    height: '32px',
+    borderRadius: 'var(--radius-pill)',
+    background: 'rgba(0, 0, 0, 0.6)',
+    color: 'white',
+    border: '2px solid white',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '16px',
+    fontWeight: 'var(--font-bold)',
+    transition: 'all var(--transition-base)',
+    zIndex: 10,
+  };
+
+  const imageIndicatorsStyles: CSSProperties = {
+    position: 'absolute',
+    bottom: 'var(--space-2)',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    display: 'flex',
+    gap: 'var(--space-1)',
+    zIndex: 10,
+  };
+
+  const indicatorDotStyles = (isActive: boolean): CSSProperties => ({
+    width: '8px',
+    height: '8px',
+    borderRadius: '50%',
+    background: isActive ? 'white' : 'rgba(255, 255, 255, 0.5)',
+    border: '1px solid rgba(0, 0, 0, 0.3)',
+    transition: 'all var(--transition-base)',
+  });
+
   return (
     <div
       style={cardStyles}
@@ -143,14 +204,79 @@ export default function ItemCard({
 
       {/* Image */}
       <div style={imageContainerStyles}>
-        <div className="skeleton" style={skeletonStyles} />
-        <img
-          src={item.images[0]}
-          alt={item.title}
-          style={imageStyles}
-          onLoad={() => setImageLoaded(true)}
-          loading="lazy"
-        />
+        {!imageLoaded && !imageError && (
+          <div className="skeleton" style={skeletonStyles} />
+        )}
+        {item.images && item.images.length > 0 && !imageError ? (
+          <>
+            <img
+              src={item.images[currentImageIndex]}
+              alt={`${item.title} - Image ${currentImageIndex + 1}`}
+              style={imageStyles}
+              onLoad={() => setImageLoaded(true)}
+              onError={() => setImageError(true)}
+              loading="lazy"
+            />
+            
+            {/* Navigation Arrows - only show if multiple images */}
+            {hasMultipleImages && (
+              <>
+                <button
+                  style={{ ...imageNavButtonStyles, left: 'var(--space-2)' }}
+                  onClick={handlePrevImage}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(0, 0, 0, 0.8)';
+                    e.currentTarget.style.transform = 'translateY(-50%) scale(1.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(0, 0, 0, 0.6)';
+                    e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
+                  }}
+                  aria-label="Previous image"
+                >
+                  ←
+                </button>
+                <button
+                  style={{ ...imageNavButtonStyles, right: 'var(--space-2)' }}
+                  onClick={handleNextImage}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(0, 0, 0, 0.8)';
+                    e.currentTarget.style.transform = 'translateY(-50%) scale(1.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(0, 0, 0, 0.6)';
+                    e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
+                  }}
+                  aria-label="Next image"
+                >
+                  →
+                </button>
+                
+                {/* Image Indicators */}
+                <div style={imageIndicatorsStyles}>
+                  {item.images.map((_, index) => (
+                    <div 
+                      key={index} 
+                      style={indicatorDotStyles(index === currentImageIndex)}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+          </>
+        ) : (
+          <div style={{
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'var(--color-gray-100)',
+            fontSize: '48px',
+          }}>
+            📦
+          </div>
+        )}
       </div>
 
       {/* Title */}
