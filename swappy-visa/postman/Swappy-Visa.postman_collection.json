@@ -1,0 +1,156 @@
+{
+  "info": {
+    "name": "Swappy-Visa",
+    "_postman_id": "swappy-visa-collection",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "url": "http://localhost:7002/api/health"
+      }
+    },
+    {
+      "name": "Create Guardian",
+      "request": {
+        "method": "POST",
+        "url": "http://localhost:7002/api/guardian"
+      }
+    },
+    {
+      "name": "PAV Verify (MOCK or Visa)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"guardianId\": \"<guardian_id>\",\n  \"pan\": \"4111111111111111\",\n  \"expMonth\": \"12\",\n  \"expYear\": \"2028\",\n  \"cvv2\": \"123\",\n  \"postalCode\": \"98195\"\n}"
+        },
+        "url": "http://localhost:7002/api/guardian/verify"
+      }
+    },
+    {
+      "name": "Create Kid (age >=8)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"dob\": \"2012-01-01\",\n  \"guardianId\": \"<guardian_id>\"\n}"
+        },
+        "url": "http://localhost:7002/api/users/kid"
+      }
+    },
+    {
+      "name": "Get Kid Cap",
+      "request": {
+        "method": "GET",
+        "url": "http://localhost:7002/api/users/kid/<kid_id>/cap"
+      }
+    },
+    {
+      "name": "Level Up Kid",
+      "request": {
+        "method": "POST",
+        "url": "http://localhost:7002/api/users/kid/<kid_id>/levelup"
+      }
+    },
+    {
+      "name": "Merchant Search (US)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"University Book Store\",\n  \"city\": \"Seattle\",\n  \"state\": \"WA\"\n}"
+        },
+        "url": "http://localhost:7002/api/merchants/search"
+      }
+    },
+    {
+      "name": "Allow Merchant",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"merchantId\": \"mock-001\",\n  \"name\": \"University Book Store\",\n  \"address\": {\n    \"city\": \"Seattle\",\n    \"state\": \"WA\"\n  }\n}"
+        },
+        "url": "http://localhost:7002/api/merchants/allow"
+      }
+    },
+    {
+      "name": "Create Listing (enforces cap)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ownerKidId\": \"<kid_id>\",\n  \"title\": \"Nerf Blaster\",\n  \"value\": 50,\n  \"merchantId\": \"mock-001\"\n}"
+        },
+        "url": "http://localhost:7002/api/listings"
+      }
+    },
+    {
+      "name": "Offer Swap",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fromListingId\": \"<listingA>\",\n  \"toListingId\": \"<listingB>\"\n}"
+        },
+        "url": "http://localhost:7002/api/offer"
+      }
+    },
+    {
+      "name": "Complete Trade",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"listingA\": \"<listingA>\",\n  \"listingB\": \"<listingB>\"\n}"
+        },
+        "url": "http://localhost:7002/api/trades/any/complete"
+      }
+    }
+  ]
+}

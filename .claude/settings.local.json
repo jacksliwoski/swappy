@@ -10,7 +10,15 @@
       "Bash(test -d web/node_modules)",
       "Bash(npm install --save-dev tsx)",
       "Bash(npm install @google/generative-ai@latest)",
-      "Bash(npm install @googlemaps/google-maps-services-js)"
+      "Bash(npm install @googlemaps/google-maps-services-js)",
+      "Bash(test -d visa-server/node_modules)",
+      "Bash(npm install)",
+      "Bash(npm run dev)",
+      "Bash(curl -s http://localhost:3000/health)",
+      "Bash(curl -s http://localhost:7002/health)",
+      "Bash(findstr \":7002\")",
+      "Bash(taskkill /PID 14244 /F)",
+      "Bash(taskkill //PID 14244 //F)"
     ],
     "deny": [],
     "ask": []

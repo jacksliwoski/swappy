@@ -1,0 +1,11 @@
+# node
+node_modules/
+# local env & certs
+.env
+.env.*         # any variants like .env.local
+visa-cert/     # your cert folder outside repo is best, but ignore anyway
+*.pem
+*.crt
+# misc
+.DS_Store
+*.log

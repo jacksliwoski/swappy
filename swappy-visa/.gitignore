@@ -1,0 +1,8 @@
+node_modules/
+.env
+.env.*
+visa-cert/
+*.pem
+*.crt
+.DS_Store
+*.log

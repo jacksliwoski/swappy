@@ -5,9 +5,11 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "dev": "concurrently \"npm run dev:server\" \"npm run dev:web\"",
-    "dev:server": "tsx watch src/server.ts",
+    "dev": "concurrently \"npm run dev:ai\" \"npm run dev:visa\" \"npm run dev:web\"",
+    "dev:ai": "tsx watch src/server.ts",
+    "dev:visa": "cd visa-server && npm run dev",
     "dev:web": "cd web && npm run dev",
+    "dev:server": "tsx watch src/server.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {

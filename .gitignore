@@ -6,6 +6,8 @@
 # Dependencies
 node_modules/
 web/node_modules/
+visa-server/node_modules/
+visa-server/.env
 
 # Build outputs
 dist/
