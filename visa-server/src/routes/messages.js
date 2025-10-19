@@ -79,8 +79,24 @@ router.post('/ensure', requireAuth, async (req, res) => {
     // Conversation id deterministic for demo: conv-<smaller>-<larger>
     const convId = userA < userB ? `conv-${userA}-${userB}` : `conv-${userB}-${userA}`;
 
-    // Ensure at least an empty conversation exists in store.messages (no-op)
+    // Ensure at least an empty conversation exists in store.messages
     if (!store.messages) store.messages = new Map();
+
+    // If no messages for this conversation exist, create a stub/system message so it appears in conversations
+    const exists = Array.from(store.messages.values()).some(m => m.conversationId === convId);
+    if (!exists) {
+      const msg = {
+        id: `msg-${Date.now()}`,
+        conversationId: convId,
+        fromUserId: userA,
+        toUserId: userB,
+        text: 'Conversation started — use this chat to coordinate meetup and payment.',
+        sentAt: new Date().toISOString(),
+        read: false,
+      };
+      store.messages.set(msg.id, msg);
+      console.log('[Messages API] Created stub message for conversation', convId, 'msg:', msg.id);
+    }
 
     return res.json({ ok: true, conversationId: convId });
   } catch (err) {
