@@ -10,11 +10,12 @@ import EventLog from '../components/trade/EventLog';
 import Button from '../components/ui/Button';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import Confetti from '../components/ui/Confetti';
+import MeetupAssistant, { MeetupDetails } from '../components/meetup/MeetupAssistant';
 import type { InventoryItem, FairnessResponse, User } from '../types';
 
 type TradeEvent = {
   id: string;
-  type: 'item_add' | 'item_remove' | 'ready' | 'not_ready' | 'both_ready' | 'confirmed';
+  type: 'item_add' | 'item_remove' | 'ready' | 'not_ready' | 'both_ready' | 'confirmed' | 'meetup';
   message: string;
   timestamp: Date;
 };
@@ -45,6 +46,8 @@ export default function TradeBuilder() {
   const [showConfetti, setShowConfetti] = useState(false);
   const [showOfferChangedNotice, setShowOfferChangedNotice] = useState(false);
   const [events, setEvents] = useState<TradeEvent[]>([]);
+  const [meetupDetails, setMeetupDetails] = useState<MeetupDetails | null>(null);
+  const [showMeetupAssistant, setShowMeetupAssistant] = useState(false);
   
   // Mobile tabs
   const [mobileInventoryTab, setMobileInventoryTab] = useState<'mine' | 'theirs'>('mine');
@@ -58,7 +61,15 @@ export default function TradeBuilder() {
   const [draggedItem, setDraggedItem] = useState<{ id: string; source: 'mine' | 'theirs' } | null>(null);
 
   useEffect(() => {
-    loadData();
+    // Get current user first, then load data
+    api.auth.me().then(res => {
+      if (res.ok && res.user) {
+        loadData(res.user.id);
+      }
+    }).catch(err => {
+      console.error('Failed to get current user:', err);
+      setLoading(false);
+    });
   }, []);
 
   useEffect(() => {
@@ -71,18 +82,25 @@ export default function TradeBuilder() {
     calculateFairness();
   }, [myOffer, theirOffer]);
 
-  async function loadData() {
+  // Show meetup assistant after both ready
+  useEffect(() => {
+    if (myReady && theirReady && !meetupDetails) {
+      setShowMeetupAssistant(true);
+    }
+  }, [myReady, theirReady, meetupDetails]);
+
+  async function loadData(userId: string) {
     setLoading(true);
     try {
       const [myData, discoverData, userData] = await Promise.all([
-        api.users.getInventory('user-1'),
+        api.users.getInventory(userId),
         api.discover.browse({}),
-        api.users.get('user-1'),
+        api.users.get(userId),
       ]);
-      
+
       setMyInventory(myData.items || []);
       setMyUser(userData);
-      
+
       // Mock their items and user (in real app, this would be specific user)
       setTheirInventory((discoverData.items || []).slice(0, 8));
       setTheirUser({
@@ -295,6 +313,33 @@ export default function TradeBuilder() {
     }
   }
 
+  function handleSetMeetup(details: MeetupDetails) {
+    setMeetupDetails(details);
+    addEvent('meetup', `Meet-up proposed: ${details.venue.name}, ${details.time}`);
+    setShowMeetupAssistant(false);
+  }
+
+  function handleUpdateMeetup(details: MeetupDetails) {
+    setMeetupDetails(details);
+    addEvent('meetup', `Meet-up updated: ${details.venue.name}, ${details.time}`);
+  }
+
+  // Calculate totals and derived values
+  const myTotal = myOffer.reduce((sum, id) => {
+    const item = myInventory.find(i => i.id === id);
+    return sum + (item?.valuation.estimate.mid || 0);
+  }, 0);
+
+  const theirTotal = theirOffer.reduce((sum, id) => {
+    const item = theirInventory.find(i => i.id === id);
+    return sum + (item?.valuation.estimate.mid || 0);
+  }, 0);
+
+  const diff = theirTotal - myTotal;
+  const balancingSuggestion = fairness && fairness.warn ? getBalancingSuggestion(diff) : null;
+  const bothReady = myReady && theirReady;
+  const canConfirm = bothReady && myOffer.length > 0 && theirOffer.length > 0;
+
   // Keyboard navigation
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -321,21 +366,6 @@ export default function TradeBuilder() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [myReady, canConfirm, calculating, myOffer.length, theirOffer.length]);
-
-  const myTotal = myOffer.reduce((sum, id) => {
-    const item = myInventory.find(i => i.id === id);
-    return sum + (item?.valuation.estimate.mid || 0);
-  }, 0);
-
-  const theirTotal = theirOffer.reduce((sum, id) => {
-    const item = theirInventory.find(i => i.id === id);
-    return sum + (item?.valuation.estimate.mid || 0);
-  }, 0);
-
-  const diff = theirTotal - myTotal;
-  const balancingSuggestion = fairness && fairness.warn ? getBalancingSuggestion(diff) : null;
-  const bothReady = myReady && theirReady;
-  const canConfirm = bothReady && myOffer.length > 0 && theirOffer.length > 0;
 
   if (loading || !myUser || !theirUser) {
     return (
@@ -596,6 +626,38 @@ export default function TradeBuilder() {
                 </>
               )}
             </div>
+          )}
+
+          {/* Meetup Details Chip */}
+          {meetupDetails && (
+            <div style={{
+              background: 'var(--color-green-light)',
+              padding: 'var(--space-2)',
+              borderRadius: 'var(--radius-md)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}>
+              <span>
+                📍 Meet-up: {meetupDetails.venue.name} · {meetupDetails.time}
+              </span>
+              <Button
+                variant="ghost"
+                onClick={() => setShowMeetupAssistant(true)}
+                style={{ fontSize: 'var(--text-sm)' }}
+              >
+                Suggest different
+              </Button>
+            </div>
+          )}
+
+          {/* Meetup Assistant */}
+          {showMeetupAssistant && (
+            <MeetupAssistant
+              isUnder18={myUser?.hasGuardian}
+              onSetMeetup={meetupDetails ? handleUpdateMeetup : handleSetMeetup}
+              onDismiss={() => setShowMeetupAssistant(false)}
+            />
           )}
 
           {/* Ready Toggle */}

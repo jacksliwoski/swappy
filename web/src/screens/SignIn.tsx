@@ -1,7 +1,9 @@
 import { useState, CSSProperties } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api, setToken } from '../utils/api';
 
 export default function SignIn() {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [msg, setMsg] = useState('');
@@ -11,11 +13,11 @@ export default function SignIn() {
     e.preventDefault();
     setMsg('');
     setLoading(true);
-    
     try {
       const res = await api.auth.login({ email, password });
       setToken(res.token);
-      location.href = '/';
+      // Simple redirect - App.tsx will check token on load
+      window.location.href = '/';
     } catch (e: any) {
       setMsg(e?.error || 'Oops! Check your email and password.');
     } finally {
@@ -24,7 +26,7 @@ export default function SignIn() {
   }
 
   const containerStyles: CSSProperties = {
-    maxWidth: '420px',
+    maxWidth: '480px',
     margin: '0 auto',
     padding: 'var(--space-8)',
   };
@@ -37,25 +39,42 @@ export default function SignIn() {
     boxShadow: 'var(--shadow-s2)',
   };
 
+  const iconStyles: CSSProperties = {
+    fontSize: '64px',
+    textAlign: 'center',
+    marginBottom: 'var(--space-4)',
+  };
+
   const titleStyles: CSSProperties = {
     fontSize: 'var(--text-h2)',
     lineHeight: 'var(--text-h2-lh)',
     fontFamily: 'var(--font-display)',
     fontWeight: 'var(--font-bold)',
     color: 'var(--color-text-1)',
-    marginBottom: 'var(--space-6)',
+    marginBottom: 'var(--space-2)',
     textAlign: 'center',
   };
 
-  const iconStyles: CSSProperties = {
-    fontSize: '48px',
+  const subtitleStyles: CSSProperties = {
+    fontSize: 'var(--text-small)',
+    color: 'var(--color-text-2)',
     textAlign: 'center',
-    marginBottom: 'var(--space-4)',
+    marginBottom: 'var(--space-6)',
+    lineHeight: 'var(--text-small-lh)',
+  };
+
+  const labelStyles: CSSProperties = {
+    display: 'block',
+    fontSize: 'var(--text-small)',
+    fontFamily: 'var(--font-body)',
+    fontWeight: 'var(--font-semibold)',
+    color: 'var(--color-text-1)',
+    marginBottom: 'var(--space-2)',
   };
 
   const inputStyles: CSSProperties = {
     width: '100%',
-    padding: 'var(--space-4)',
+    padding: 'var(--space-3)',
     fontSize: 'var(--text-body)',
     fontFamily: 'var(--font-body)',
     fontWeight: 'var(--font-medium)',
@@ -79,17 +98,34 @@ export default function SignIn() {
     transition: 'all var(--transition-base)',
     boxShadow: 'var(--shadow-s1)',
     opacity: loading ? 0.6 : 1,
+    marginTop: 'var(--space-2)',
   };
 
   const errorStyles: CSSProperties = {
     marginTop: 'var(--space-4)',
     padding: 'var(--space-3)',
-    background: 'var(--color-error-light)',
-    color: 'var(--color-error)',
+    background: 'var(--color-rating-bad-bg)',
+    color: 'var(--color-rating-bad-text)',
     borderRadius: 'var(--radius-sm)',
     fontSize: 'var(--text-small)',
     fontWeight: 'var(--font-semibold)',
     textAlign: 'center',
+  };
+
+  const demoBoxStyles: CSSProperties = {
+    marginTop: 'var(--space-6)',
+    padding: 'var(--space-4)',
+    background: 'var(--color-rating-great-bg)',
+    borderRadius: 'var(--radius-md)',
+    fontSize: 'var(--text-small)',
+    lineHeight: 'var(--text-small-lh)',
+    color: 'var(--color-text-2)',
+  };
+
+  const demoTitleStyles: CSSProperties = {
+    fontWeight: 'var(--font-bold)',
+    color: 'var(--color-rating-great-text)',
+    marginBottom: 'var(--space-2)',
   };
 
   const linksStyles: CSSProperties = {
@@ -103,49 +139,57 @@ export default function SignIn() {
     color: 'var(--color-brand)',
     fontWeight: 'var(--font-semibold)',
     textDecoration: 'none',
-    transition: 'color var(--transition-fast)',
+    display: 'block',
+    marginBottom: 'var(--space-2)',
+  };
+
+  const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    e.currentTarget.style.borderColor = 'var(--color-brand)';
+    e.currentTarget.style.boxShadow = 'var(--shadow-s1)';
+  };
+
+  const handleInputBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    e.currentTarget.style.borderColor = 'var(--color-border)';
+    e.currentTarget.style.boxShadow = 'none';
   };
 
   return (
     <div style={containerStyles}>
       <div style={cardStyles}>
         <div style={iconStyles}>👋</div>
-        <h1 style={titleStyles}>Welcome Back!</h1>
+        <h1 style={titleStyles}>Welcome back!</h1>
+        <p style={subtitleStyles}>
+          Sign in to continue trading awesome toys
+        </p>
         
         <form onSubmit={onSubmit}>
-          <input
-            style={inputStyles}
-            type="email"
-            placeholder="Your email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            onFocus={(e) => {
-              e.currentTarget.style.borderColor = 'var(--color-brand)';
-              e.currentTarget.style.boxShadow = 'var(--shadow-s1)';
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.borderColor = 'var(--color-border)';
-              e.currentTarget.style.boxShadow = 'none';
-            }}
-          />
+          <div>
+            <label style={labelStyles}>Email</label>
+            <input
+              style={inputStyles}
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              onFocus={handleInputFocus}
+              onBlur={handleInputBlur}
+            />
+          </div>
           
-          <input
-            style={inputStyles}
-            type="password"
-            placeholder="Your password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            onFocus={(e) => {
-              e.currentTarget.style.borderColor = 'var(--color-brand)';
-              e.currentTarget.style.boxShadow = 'var(--shadow-s1)';
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.borderColor = 'var(--color-border)';
-              e.currentTarget.style.boxShadow = 'none';
-            }}
-          />
+          <div>
+            <label style={labelStyles}>Password</label>
+            <input
+              style={inputStyles}
+              type="password"
+              placeholder="Enter your password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              onFocus={handleInputFocus}
+              onBlur={handleInputBlur}
+            />
+          </div>
           
           <button
             style={buttonStyles}
@@ -166,18 +210,30 @@ export default function SignIn() {
               }
             }}
           >
-            {loading ? 'Signing in...' : 'Sign In 🚀'}
+            {loading ? 'Signing in...' : 'Sign in 🚀'}
           </button>
         </form>
         
         {msg && <div style={errorStyles}>{msg}</div>}
         
+        <div style={demoBoxStyles}>
+          <div style={demoTitleStyles}>🎮 Try the demo!</div>
+          <div style={{marginBottom: 'var(--space-2)'}}>
+            <strong>Jack:</strong> jack@swappy.demo / password123
+          </div>
+          <div>
+            <strong>Anderson:</strong> anderson@swappy.demo / password123
+          </div>
+        </div>
+        
         <div style={linksStyles}>
-          <a href="/forgot-password" style={linkStyles}>Forgot password?</a>
-          {' • '}
-          No account? <a href="/signup" style={linkStyles}>Create one!</a>
+          <a href="/forgot-password" style={linkStyles}>Forgot your password?</a>
+          <div style={{marginTop: 'var(--space-4)'}}>
+            Don't have an account? <a href="/signup" style={{...linkStyles, display: 'inline'}}>Sign up!</a>
+          </div>
         </div>
       </div>
     </div>
   );
 }
+

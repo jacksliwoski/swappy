@@ -1,30 +1,55 @@
-import { useState, CSSProperties } from 'react';
+import { useState, useEffect, CSSProperties } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../utils/api';
 
-export default function ForgotPassword() {
-  const [email, setEmail] = useState('');
+export default function ResetPassword() {
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get('token') || '';
+  
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [msg, setMsg] = useState('');
-  const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!token) {
+      setMsg('Missing reset token. Please use the link from your email.');
+    }
+  }, [token]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setMsg('');
-    setLoading(true);
+    setSuccess(false);
     
+    if (newPassword !== confirmPassword) {
+      setMsg('Passwords don\'t match!');
+      return;
+    }
+    
+    if (newPassword.length < 6) {
+      setMsg('Password must be at least 6 characters long.');
+      return;
+    }
+    
+    setLoading(true);
     try {
-      await api.auth.forgot(email);
+      await api.auth.reset(token, newPassword);
       setSuccess(true);
-      setMsg('If an account exists, a reset link has been written to the server outbox.');
+      setMsg('Password reset! Redirecting to sign in...');
+      setTimeout(() => {
+        window.location.href = '/signin';
+      }, 2000);
     } catch (e: any) {
-      setMsg(e?.error || 'Oops! Something went wrong.');
+      setMsg(e?.error || 'Oops! Something went wrong. The link might be expired.');
     } finally {
       setLoading(false);
     }
   }
 
   const containerStyles: CSSProperties = {
-    maxWidth: '420px',
+    maxWidth: '480px',
     margin: '0 auto',
     padding: 'var(--space-8)',
   };
@@ -35,6 +60,12 @@ export default function ForgotPassword() {
     border: '2px solid var(--color-border)',
     padding: 'var(--space-8)',
     boxShadow: 'var(--shadow-s2)',
+  };
+
+  const iconStyles: CSSProperties = {
+    fontSize: '64px',
+    textAlign: 'center',
+    marginBottom: 'var(--space-4)',
   };
 
   const titleStyles: CSSProperties = {
@@ -55,15 +86,18 @@ export default function ForgotPassword() {
     lineHeight: 'var(--text-small-lh)',
   };
 
-  const iconStyles: CSSProperties = {
-    fontSize: '48px',
-    textAlign: 'center',
-    marginBottom: 'var(--space-4)',
+  const labelStyles: CSSProperties = {
+    display: 'block',
+    fontSize: 'var(--text-small)',
+    fontFamily: 'var(--font-body)',
+    fontWeight: 'var(--font-semibold)',
+    color: 'var(--color-text-1)',
+    marginBottom: 'var(--space-2)',
   };
 
   const inputStyles: CSSProperties = {
     width: '100%',
-    padding: 'var(--space-4)',
+    padding: 'var(--space-3)',
     fontSize: 'var(--text-body)',
     fontFamily: 'var(--font-body)',
     fontWeight: 'var(--font-medium)',
@@ -83,17 +117,18 @@ export default function ForgotPassword() {
     border: 'none',
     background: 'var(--color-brand)',
     color: 'white',
-    cursor: loading ? 'not-allowed' : 'pointer',
+    cursor: loading || !token ? 'not-allowed' : 'pointer',
     transition: 'all var(--transition-base)',
     boxShadow: 'var(--shadow-s1)',
-    opacity: loading ? 0.6 : 1,
+    opacity: (loading || !token) ? 0.6 : 1,
+    marginTop: 'var(--space-2)',
   };
 
   const messageStyles: CSSProperties = {
     marginTop: 'var(--space-4)',
     padding: 'var(--space-3)',
-    background: success ? 'var(--color-success-light)' : 'var(--color-error-light)',
-    color: success ? 'var(--color-success)' : 'var(--color-error)',
+    background: success ? 'var(--color-rating-great-bg)' : 'var(--color-rating-bad-bg)',
+    color: success ? 'var(--color-rating-great-text)' : 'var(--color-rating-bad-text)',
     borderRadius: 'var(--radius-sm)',
     fontSize: 'var(--text-small)',
     fontWeight: 'var(--font-semibold)',
@@ -114,54 +149,78 @@ export default function ForgotPassword() {
     textDecoration: 'none',
   };
 
+  const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    e.currentTarget.style.borderColor = 'var(--color-brand)';
+    e.currentTarget.style.boxShadow = 'var(--shadow-s1)';
+  };
+
+  const handleInputBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    e.currentTarget.style.borderColor = 'var(--color-border)';
+    e.currentTarget.style.boxShadow = 'none';
+  };
+
   return (
     <div style={containerStyles}>
       <div style={cardStyles}>
-        <div style={iconStyles}>🔑</div>
-        <h1 style={titleStyles}>Forgot Password?</h1>
+        <div style={iconStyles}>🔐</div>
+        <h1 style={titleStyles}>Reset Your Password</h1>
         <p style={subtitleStyles}>
-          No worries! We'll help you reset it.
+          Choose a new password for your account
         </p>
         
         <form onSubmit={onSubmit}>
-          <input
-            style={inputStyles}
-            type="email"
-            placeholder="Your email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            disabled={success}
-            onFocus={(e) => {
-              e.currentTarget.style.borderColor = 'var(--color-brand)';
-              e.currentTarget.style.boxShadow = 'var(--shadow-s1)';
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.borderColor = 'var(--color-border)';
-              e.currentTarget.style.boxShadow = 'none';
-            }}
-          />
+          <div>
+            <label style={labelStyles}>New Password</label>
+            <input
+              style={inputStyles}
+              type="password"
+              placeholder="Enter new password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              required
+              minLength={6}
+              disabled={!token}
+              onFocus={handleInputFocus}
+              onBlur={handleInputBlur}
+            />
+          </div>
+          
+          <div>
+            <label style={labelStyles}>Confirm Password</label>
+            <input
+              style={inputStyles}
+              type="password"
+              placeholder="Enter password again"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              minLength={6}
+              disabled={!token}
+              onFocus={handleInputFocus}
+              onBlur={handleInputBlur}
+            />
+          </div>
           
           <button
             style={buttonStyles}
             type="submit"
-            disabled={loading || success}
+            disabled={loading || !token}
             onMouseEnter={(e) => {
-              if (!loading && !success) {
+              if (!loading && token) {
                 e.currentTarget.style.background = 'var(--color-brand-ink)';
                 e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
                 e.currentTarget.style.boxShadow = 'var(--shadow-s2)';
               }
             }}
             onMouseLeave={(e) => {
-              if (!loading && !success) {
+              if (!loading && token) {
                 e.currentTarget.style.background = 'var(--color-brand)';
                 e.currentTarget.style.transform = 'none';
                 e.currentTarget.style.boxShadow = 'var(--shadow-s1)';
               }
             }}
           >
-            {loading ? 'Sending...' : success ? 'Link Sent! ✓' : 'Send Reset Link 📧'}
+            {loading ? 'Resetting...' : 'Reset Password 🔐'}
           </button>
         </form>
         
@@ -174,3 +233,4 @@ export default function ForgotPassword() {
     </div>
   );
 }
+

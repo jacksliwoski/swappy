@@ -12,6 +12,7 @@ export default function Inventory() {
   const navigate = useNavigate();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [filters, setFilters] = useState({
     category: '',
     condition: '',
@@ -19,13 +20,22 @@ export default function Inventory() {
   });
 
   useEffect(() => {
-    loadInventory();
+    // Get current user first
+    api.auth.me().then(res => {
+      if (res.ok && res.user) {
+        setCurrentUser(res.user);
+        loadInventory(res.user.id);
+      }
+    }).catch(err => {
+      console.error('Failed to get current user:', err);
+      setLoading(false);
+    });
   }, []);
 
-  async function loadInventory() {
+  async function loadInventory(userId: string) {
     setLoading(true);
     try {
-      const data = await api.users.getInventory('user-1');
+      const data = await api.users.getInventory(userId);
       setItems(data.items || []);
     } catch (error) {
       console.error('Failed to load inventory:', error);

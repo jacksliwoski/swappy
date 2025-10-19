@@ -49,9 +49,17 @@ const MeetupSuggestionsInputSchema = z.object({
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
+// Middleware - Allow all localhost ports for development
 app.use(cors({
-  origin: 'http://localhost:5173'
+  origin: (origin, callback) => {
+    // Allow requests from any localhost port or no origin (like mobile apps or curl)
+    if (!origin || origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
 }));
 app.use(express.json({ limit: '50mb' }));
 

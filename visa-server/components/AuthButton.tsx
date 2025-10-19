@@ -1,9 +1,9 @@
-// src/components/AuthButton.tsx
-import { useEffect, useState } from 'react';
+import { useEffect, useState, CSSProperties } from 'react';
 import { getToken, clearToken } from '../utils/api';
 
 export default function AuthButton() {
   const [authed, setAuthed] = useState<boolean>(() => !!getToken());
+  const [isHovered, setIsHovered] = useState(false);
 
   useEffect(() => {
     const onStorage = () => setAuthed(!!getToken());
@@ -11,26 +11,50 @@ export default function AuthButton() {
     return () => window.removeEventListener('storage', onStorage);
   }, []);
 
-  const baseStyle: React.CSSProperties = {
-    padding: '0.5rem 1rem',
-    borderRadius: '9999px',
-    border: '1px solid #e5e7eb',
-    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-    background: 'white',
+  const buttonStyles: CSSProperties = {
+    padding: '8px 16px',
+    borderRadius: 'var(--radius-pill)',
+    border: '2px solid var(--color-brand)',
+    boxShadow: 'var(--shadow-s1)',
+    background: authed ? 'var(--color-surface)' : 'var(--color-brand)',
+    color: authed ? 'var(--color-brand-ink)' : 'white',
     cursor: 'pointer',
     textDecoration: 'none',
-    color: 'inherit'
+    fontFamily: 'var(--font-body)',
+    fontWeight: 'var(--font-semibold)',
+    fontSize: 'var(--text-small)',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 'var(--space-2)',
+    transition: 'all var(--transition-base)',
+    transform: isHovered ? 'translateY(-2px) scale(1.05)' : 'none',
   };
 
   if (!authed) {
-    return <a href="/signin" style={baseStyle}>Sign in</a>;
+    return (
+      <a
+        href="/signin"
+        style={buttonStyles}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        👋 Sign in
+      </a>
+    );
   }
+
   return (
     <button
-      style={baseStyle}
-      onClick={() => { clearToken(); setAuthed(false); }}
+      style={buttonStyles}
+      onClick={() => {
+        clearToken();
+        setAuthed(false);
+        location.href = '/signin';
+      }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
-      Sign out
+      👋 Sign out
     </button>
   );
 }

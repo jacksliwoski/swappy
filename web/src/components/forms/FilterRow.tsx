@@ -1,3 +1,4 @@
+import { CSSProperties } from 'react';
 import Chip from '../ui/Chip';
 
 interface FilterRowProps {
@@ -17,84 +18,108 @@ export default function FilterRow({ filters, onChange, hasCurrentOffer }: Filter
   const ratings = ['great', 'fair', 'bad'];
   const sorts = ['best', 'newest', 'closest', 'value'];
 
+  const sectionStyles: CSSProperties = {
+    marginBottom: 'var(--space-6)',
+  };
+
+  const labelStyles: CSSProperties = {
+    fontSize: 'var(--text-body)',
+    lineHeight: 'var(--text-body-lh)',
+    fontFamily: 'var(--font-display)',
+    fontWeight: 'var(--font-semibold)',
+    color: 'var(--color-text-1)',
+    marginBottom: 'var(--space-3)',
+    display: 'block',
+  };
+
+  const chipRowStyles: CSSProperties = {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 'var(--space-2)',
+  };
+
   return (
-    <div style={{ marginBottom: '2rem' }}>
+    <div style={{ marginBottom: 'var(--space-8)' }}>
       {/* Category */}
-      <div style={{ marginBottom: '1rem' }}>
-        <label style={{ fontWeight: 'var(--font-semibold)', marginRight: '1rem', display: 'inline-block', minWidth: '100px' }}>
-          Category:
-        </label>
-        {categories.map(c => (
-          <Chip
-            key={c}
-            bgColor={filters.category === c ? 'var(--color-primary)' : undefined}
-            color={filters.category === c ? 'white' : undefined}
-            onClick={() => onChange({ ...filters, category: filters.category === c ? '' : c })}
-            style={{ marginRight: '0.5rem', marginBottom: '0.5rem' }}
-          >
-            {c}
-          </Chip>
-        ))}
+      <div style={sectionStyles}>
+        <label style={labelStyles}>Category</label>
+        <div style={chipRowStyles}>
+          {categories.map(c => (
+            <Chip
+              key={c}
+              selected={filters.category === c}
+              onClick={() => onChange({ ...filters, category: filters.category === c ? '' : c })}
+              variant="category"
+            >
+              {c}
+            </Chip>
+          ))}
+        </div>
       </div>
 
       {/* Condition */}
-      <div style={{ marginBottom: '1rem' }}>
-        <label style={{ fontWeight: 'var(--font-semibold)', marginRight: '1rem', display: 'inline-block', minWidth: '100px' }}>
-          Condition:
-        </label>
-        {conditions.map(c => (
-          <Chip
-            key={c}
-            bgColor={filters.condition === c ? 'var(--color-primary)' : undefined}
-            color={filters.condition === c ? 'white' : undefined}
-            onClick={() => onChange({ ...filters, condition: filters.condition === c ? '' : c })}
-            style={{ marginRight: '0.5rem', marginBottom: '0.5rem' }}
-          >
-            {c}
-          </Chip>
-        ))}
+      <div style={sectionStyles}>
+        <label style={labelStyles}>Condition</label>
+        <div style={chipRowStyles}>
+          {conditions.map(c => (
+            <Chip
+              key={c}
+              selected={filters.condition === c}
+              onClick={() => onChange({ ...filters, condition: filters.condition === c ? '' : c })}
+              variant="condition"
+            >
+              {c}
+            </Chip>
+          ))}
+        </div>
       </div>
 
       {/* Trade Value */}
-      <div style={{ marginBottom: '1rem' }}>
-        <label style={{ fontWeight: 'var(--font-semibold)', marginRight: '1rem', display: 'inline-block', minWidth: '100px' }}>
-          Trade Value:
-        </label>
-        {ratings.map(r => (
-          <Chip
-            key={r}
-            bgColor={filters.tradeValue === r ? 'var(--color-primary)' : hasCurrentOffer ? undefined : 'var(--color-gray-100)'}
-            color={filters.tradeValue === r ? 'white' : hasCurrentOffer ? undefined : 'var(--color-gray-400)'}
-            onClick={hasCurrentOffer ? () => onChange({ ...filters, tradeValue: filters.tradeValue === r ? '' : r }) : undefined}
-            style={{
-              marginRight: '0.5rem',
-              marginBottom: '0.5rem',
-              cursor: hasCurrentOffer ? 'pointer' : 'not-allowed',
-            }}
-          >
-            <span title={!hasCurrentOffer ? 'Pick items in Trade Builder to see ratings here' : ''}>
-              {r}
+      <div style={sectionStyles}>
+        <label style={labelStyles}>
+          Trade Value
+          {!hasCurrentOffer && (
+            <span style={{
+              fontSize: 'var(--text-small)',
+              fontWeight: 'var(--font-medium)',
+              color: 'var(--color-gray-400)',
+              marginLeft: 'var(--space-2)',
+              fontStyle: 'italic',
+            }}>
+              (pick items first!)
             </span>
-          </Chip>
-        ))}
+          )}
+        </label>
+        <div style={chipRowStyles}>
+          {ratings.map(r => (
+            <Chip
+              key={r}
+              selected={filters.tradeValue === r}
+              disabled={!hasCurrentOffer}
+              onClick={hasCurrentOffer ? () => onChange({ ...filters, tradeValue: filters.tradeValue === r ? '' : r }) : undefined}
+            >
+              <span title={!hasCurrentOffer ? 'Pick items in Trade Builder to see ratings here' : ''}>
+                {r}
+              </span>
+            </Chip>
+          ))}
+        </div>
       </div>
 
       {/* Sort */}
-      <div>
-        <label style={{ fontWeight: 'var(--font-semibold)', marginRight: '1rem', display: 'inline-block', minWidth: '100px' }}>
-          Sort:
-        </label>
-        {sorts.map(s => (
-          <Chip
-            key={s}
-            bgColor={filters.sort === s ? 'var(--color-primary)' : undefined}
-            color={filters.sort === s ? 'white' : undefined}
-            onClick={() => onChange({ ...filters, sort: s })}
-            style={{ marginRight: '0.5rem', marginBottom: '0.5rem' }}
-          >
-            {s}
-          </Chip>
-        ))}
+      <div style={sectionStyles}>
+        <label style={labelStyles}>Sort by</label>
+        <div style={chipRowStyles}>
+          {sorts.map(s => (
+            <Chip
+              key={s}
+              selected={filters.sort === s}
+              onClick={() => onChange({ ...filters, sort: s })}
+            >
+              {s}
+            </Chip>
+          ))}
+        </div>
       </div>
     </div>
   );

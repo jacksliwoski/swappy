@@ -38,7 +38,6 @@ export default function EventLog({ events }: EventLogProps) {
             key={event.id}
             style={{
               fontSize: 'var(--text-sm)',
-              color: 'var(--color-gray-700)',
               padding: 'var(--space-2)',
               background: event.type === 'both_ready' || event.type === 'confirmed' 
                 ? 'var(--color-success)' 

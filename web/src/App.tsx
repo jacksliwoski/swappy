@@ -1,5 +1,8 @@
-import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
-import { useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
+import { useState, useEffect, CSSProperties } from 'react';
+import { getToken, clearToken } from './utils/api';
+
+// Main app screens
 import Discover from './screens/Discover';
 import Inventory from './screens/Inventory';
 import AddToInventory from './screens/AddToInventory';
@@ -7,142 +10,398 @@ import TradeBuilder from './screens/TradeBuilder';
 import Messages from './screens/Messages';
 import Profile from './screens/Profile';
 import Settings from './screens/Settings';
-import MeetupSuggestions from './components/MeetupSuggestions';
+
+// Auth screens
+import SignIn from './screens/SignIn';
+import SignUp from './screens/SignUp';
+import ForgotPassword from './screens/ForgotPassword';
+import ResetPassword from './screens/ResetPassword';
 
 function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // Initialize with the actual token state immediately to avoid race condition
+  const [isAuthenticated, setIsAuthenticated] = useState(() => !!getToken());
+
+  // Check auth status on mount (in case token was set after initial render)
+  useEffect(() => {
+    const token = getToken();
+    setIsAuthenticated(!!token);
+  }, []);
 
   return (
     <BrowserRouter>
-      <div style={{ minHeight: '100vh', background: 'var(--color-gray-50)' }}>
-        {/* Header */}
-        <header style={{
-          height: 'var(--header-height)',
-          background: 'var(--color-white)',
-          borderBottom: '2px solid var(--color-gray-200)',
-          display: 'flex',
-          alignItems: 'center',
-          padding: '0 1rem',
-          position: 'sticky',
-          top: 0,
-          zIndex: 100,
-        }}>
-          <button
-            onClick={() => setDrawerOpen(!drawerOpen)}
-            className="btn"
-            style={{ marginRight: '1rem', fontSize: '1.5rem' }}
-          >
-            ☰
-          </button>
-          <Link
-            to="/"
-            style={{
-              fontSize: 'var(--text-2xl)',
-              fontWeight: 'var(--font-bold)',
-              color: 'var(--color-primary)',
-              flex: 1,
-              textDecoration: 'none',
-            }}
-          >
-            Swappy 🔄
-          </Link>
-          <Link to="/profile">
-            <div style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: 'var(--radius-full)',
-              background: 'var(--color-lilac-light)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '1.5rem',
-            }}>
-              😊
-            </div>
-          </Link>
-        </header>
-
-        {/* Drawer */}
-        {drawerOpen && (
-          <>
-            <div
-              onClick={() => setDrawerOpen(false)}
-              style={{
-                position: 'fixed',
-                inset: 0,
-                background: 'rgba(0, 0, 0, 0.5)',
-                zIndex: 200,
-              }}
-            />
-            <aside style={{
-              position: 'fixed',
-              left: 0,
-              top: 0,
-              bottom: 0,
-              width: 'var(--drawer-width)',
-              background: 'var(--color-white)',
-              boxShadow: 'var(--shadow-xl)',
-              zIndex: 300,
-              padding: '1.5rem',
-            }}>
-              <h2 style={{ marginBottom: '2rem', color: 'var(--color-primary)' }}>Menu</h2>
-              <nav>
-                <ul style={{ listStyle: 'none' }}>
-                  {[
-                    { to: '/discover', icon: '🔍', label: 'Discover' },
-                    { to: '/inventory', icon: '📦', label: 'My Inventory' },
-                    { to: '/add', icon: '➕', label: 'Add Item' },
-                    { to: '/trades', icon: '🔄', label: 'Trade Builder' },
-                    { to: '/messages', icon: '💬', label: 'Messages' },
-                    { to: '/meetup', icon: '📍', label: 'Safe Meetup' },
-                    { to: '/profile', icon: '👤', label: 'Profile & XP' },
-                    { to: '/settings', icon: '⚙️', label: 'Settings' },
-                  ].map(item => (
-                    <li key={item.to} style={{ marginBottom: '0.5rem' }}>
-                      <Link
-                        to={item.to}
-                        onClick={() => setDrawerOpen(false)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '1rem',
-                          padding: '0.75rem',
-                          borderRadius: 'var(--radius-md)',
-                          fontSize: '1.125rem',
-                          textDecoration: 'none',
-                          color: 'var(--color-gray-800)',
-                          transition: 'background var(--transition-fast)',
-                        }}
-                        onMouseOver={(e) => e.currentTarget.style.background = 'var(--color-gray-100)'}
-                        onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
-                      >
-                        <span style={{ fontSize: '1.5rem' }}>{item.icon}</span>
-                        {item.label}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </nav>
-            </aside>
-          </>
-        )}
-
-        {/* Main Content */}
-        <main>
-          <Routes>
-            <Route path="/" element={<Navigate to="/discover" replace />} />
-            <Route path="/discover" element={<Discover />} />
-            <Route path="/inventory" element={<Inventory />} />
-            <Route path="/add" element={<AddToInventory />} />
-            <Route path="/trades/:tradeId?" element={<TradeBuilder />} />
-            <Route path="/messages/:conversationId?" element={<Messages />} />
-            <Route path="/meetup" element={<MeetupSuggestions />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/settings" element={<Settings />} />
-          </Routes>
-        </main>
-      </div>
+      <Routes>
+        {/* Public auth routes */}
+        <Route path="/signin" element={<SignIn />} />
+        <Route path="/signup" element={<SignUp />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        
+        {/* Protected app routes */}
+        <Route path="/*" element={
+          <ProtectedApp 
+            drawerOpen={drawerOpen} 
+            setDrawerOpen={setDrawerOpen}
+            isAuthenticated={isAuthenticated}
+            setIsAuthenticated={setIsAuthenticated}
+          />
+        } />
+      </Routes>
     </BrowserRouter>
+  );
+}
+
+// Protected app wrapper
+function ProtectedApp({ 
+  drawerOpen, 
+  setDrawerOpen,
+  isAuthenticated,
+  setIsAuthenticated
+}: { 
+  drawerOpen: boolean;
+  setDrawerOpen: (open: boolean) => void;
+  isAuthenticated: boolean;
+  setIsAuthenticated: (auth: boolean) => void;
+}) {
+  // If not authenticated, redirect to signin
+  if (!isAuthenticated) {
+    return <Navigate to="/signin" replace />;
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
+      <AppHeader
+        onMenuClick={() => setDrawerOpen(!drawerOpen)}
+        onSignOut={() => {
+          clearToken();
+          setIsAuthenticated(false);
+          window.location.href = '/signin';
+        }}
+      />
+      
+      {drawerOpen && (
+        <AppDrawer 
+          isOpen={drawerOpen} 
+          onClose={() => setDrawerOpen(false)} 
+        />
+      )}
+
+      <main>
+        <Routes>
+          <Route path="/" element={<Navigate to="/discover" replace />} />
+          <Route path="/discover" element={<Discover />} />
+          <Route path="/inventory" element={<Inventory />} />
+          <Route path="/add" element={<AddToInventory />} />
+          <Route path="/trades/:tradeId?" element={<TradeBuilder />} />
+          <Route path="/messages/:conversationId?" element={<Messages />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/settings" element={<Settings />} />
+        </Routes>
+      </main>
+    </div>
+  );
+}
+
+// Header Component - Kid-friendly & playful
+function AppHeader({ onMenuClick, onSignOut }: { onMenuClick: () => void; onSignOut: () => void }) {
+  const [isHovered, setIsHovered] = useState(false);
+
+  const headerStyles: CSSProperties = {
+    height: 'var(--header-height)',
+    background: 'var(--color-surface)',
+    borderBottom: '2px solid var(--color-border)',
+    display: 'flex',
+    alignItems: 'center',
+    padding: '0 var(--container-gutter)',
+    position: 'sticky',
+    top: 0,
+    zIndex: 100,
+    boxShadow: 'var(--shadow-s1)',
+  };
+
+  const menuButtonStyles: CSSProperties = {
+    width: '44px',
+    height: '44px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 'var(--space-4)',
+    fontSize: '24px',
+    background: 'transparent',
+    border: 'none',
+    cursor: 'pointer',
+    borderRadius: 'var(--radius-sm)',
+    color: 'var(--color-text-2)',
+    transition: 'all var(--transition-fast)',
+  };
+
+  const brandStyles: CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 'var(--space-2)',
+    fontSize: 'var(--text-h2)',
+    fontFamily: 'var(--font-display)',
+    fontWeight: 'var(--font-bold)',
+    color: 'var(--color-brand-ink)',
+    textDecoration: 'none',
+    flex: 1,
+    transition: 'transform var(--transition-fast)',
+  };
+
+  const iconStyles: CSSProperties = {
+    fontSize: '28px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  };
+
+  const signOutButtonStyles: CSSProperties = {
+    padding: '8px 16px',
+    borderRadius: 'var(--radius-pill)',
+    border: '2px solid var(--color-brand)',
+    boxShadow: 'var(--shadow-s1)',
+    background: 'var(--color-surface)',
+    color: 'var(--color-brand-ink)',
+    cursor: 'pointer',
+    fontFamily: 'var(--font-body)',
+    fontWeight: 'var(--font-semibold)',
+    fontSize: 'var(--text-small)',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 'var(--space-2)',
+    transition: 'all var(--transition-base)',
+    transform: isHovered ? 'translateY(-2px) scale(1.05)' : 'none',
+  };
+
+  const avatarStyles: CSSProperties = {
+    width: '48px',
+    height: '48px',
+    borderRadius: 'var(--radius-pill)',
+    background: 'var(--color-brand-tint)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '24px',
+    border: '3px solid var(--color-brand)',
+    transition: 'all var(--transition-base)',
+    cursor: 'pointer',
+    marginRight: 'var(--space-3)',
+  };
+
+  return (
+    <header style={headerStyles}>
+      <button
+        style={menuButtonStyles}
+        onClick={onMenuClick}
+        aria-label="Open menu"
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = 'var(--color-brand-tint)';
+          e.currentTarget.style.transform = 'scale(1.1)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = 'transparent';
+          e.currentTarget.style.transform = 'scale(1)';
+        }}
+      >
+        ☰
+      </button>
+      <Link 
+        to="/" 
+        style={brandStyles}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'scale(1.05)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'scale(1)';
+        }}
+      >
+        <span style={iconStyles}>🔄</span>
+        <span>Swappy</span>
+      </Link>
+      <Link 
+        to="/profile"
+        style={{...avatarStyles}}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'scale(1.1) rotate(5deg)';
+          e.currentTarget.style.boxShadow = 'var(--shadow-s2)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'none';
+          e.currentTarget.style.boxShadow = 'none';
+        }}
+      >
+        😊
+      </Link>
+      <button
+        style={signOutButtonStyles}
+        onClick={onSignOut}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        👋 Sign out
+      </button>
+    </header>
+  );
+}
+
+// Drawer Component - Grouped & colorful
+function AppDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  const location = useLocation();
+
+  const backdropStyles: CSSProperties = {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(15, 23, 42, 0.5)',
+    zIndex: 200,
+    backdropFilter: 'blur(3px)',
+    animation: 'fadeIn 0.2s ease-out',
+  };
+
+  const drawerStyles: CSSProperties = {
+    position: 'fixed',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 'var(--drawer-width)',
+    background: 'var(--color-surface)',
+    boxShadow: 'var(--shadow-s2)',
+    zIndex: 300,
+    padding: 'var(--space-6)',
+    overflowY: 'auto',
+    animation: 'slideDown 0.3s ease-out',
+  };
+
+  const headerStyles: CSSProperties = {
+    marginBottom: 'var(--space-8)',
+    paddingBottom: 'var(--space-4)',
+    borderBottom: '2px solid var(--color-border)',
+  };
+
+  const titleStyles: CSSProperties = {
+    fontSize: 'var(--text-h2)',
+    fontFamily: 'var(--font-display)',
+    fontWeight: 'var(--font-bold)',
+    color: 'var(--color-brand-ink)',
+    marginBottom: 'var(--space-1)',
+  };
+
+  const subtitleStyles: CSSProperties = {
+    fontSize: 'var(--text-small)',
+    color: 'var(--color-text-2)',
+    fontWeight: 'var(--font-medium)',
+  };
+
+  const menuItems = [
+    { to: '/discover', icon: '🔍', label: 'Discover', color: 'var(--color-accent-blue)' },
+    { to: '/inventory', icon: '📦', label: 'My Toy Box', color: 'var(--color-accent-purple)' },
+    { to: '/add', icon: '➕', label: 'Add Item', color: 'var(--color-accent-yellow)' },
+    { to: '/trades', icon: '🔄', label: 'Trade Room', color: 'var(--color-brand)' },
+    { to: '/messages', icon: '💬', label: 'Messages', color: 'var(--color-accent-coral)' },
+    { to: '/profile', icon: '👤', label: 'Profile & XP', color: 'var(--color-accent-purple)' },
+    { to: '/settings', icon: '⚙️', label: 'Settings', color: 'var(--color-gray-500)' },
+  ];
+
+  return (
+    <>
+      <div style={backdropStyles} onClick={onClose} />
+      <aside style={drawerStyles}>
+        <div style={headerStyles}>
+          <h2 style={titleStyles}>Menu</h2>
+          <p style={subtitleStyles}>What do you want to do today?</p>
+        </div>
+        <nav>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+            {menuItems.map(item => {
+              const isActive = location.pathname.startsWith(item.to);
+              return (
+                <NavItem
+                  key={item.to}
+                  to={item.to}
+                  icon={item.icon}
+                  label={item.label}
+                  color={item.color}
+                  isActive={isActive}
+                  onClick={onClose}
+                />
+              );
+            })}
+          </ul>
+        </nav>
+      </aside>
+    </>
+  );
+}
+
+// Nav Item Component - Colorful & interactive
+function NavItem({ 
+  to, 
+  icon, 
+  label, 
+  color,
+  isActive, 
+  onClick 
+}: { 
+  to: string; 
+  icon: string; 
+  label: string; 
+  color: string;
+  isActive: boolean; 
+  onClick: () => void;
+}) {
+  const linkStyles: CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 'var(--space-3)',
+    padding: 'var(--space-3) var(--space-4)',
+    marginBottom: 'var(--space-2)',
+    borderRadius: 'var(--radius-md)',
+    fontSize: 'var(--text-body)',
+    fontWeight: isActive ? 'var(--font-bold)' : 'var(--font-semibold)',
+    fontFamily: 'var(--font-body)',
+    textDecoration: 'none',
+    color: isActive ? 'var(--color-brand-ink)' : 'var(--color-text-2)',
+    background: isActive ? 'var(--color-brand-tint)' : 'transparent',
+    border: isActive ? '2px solid var(--color-brand)' : '2px solid transparent',
+    transition: 'all var(--transition-fast)',
+    boxShadow: isActive ? 'var(--shadow-s1)' : 'none',
+  };
+
+  const iconStyles: CSSProperties = {
+    fontSize: '24px',
+    width: '32px',
+    height: '32px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 'var(--radius-sm)',
+    background: isActive ? color + '20' : 'transparent',
+  };
+
+  return (
+    <li>
+      <Link
+        to={to}
+        onClick={onClick}
+        style={linkStyles}
+        onMouseEnter={(e) => {
+          if (!isActive) {
+            e.currentTarget.style.background = 'var(--color-chip-bg)';
+            e.currentTarget.style.transform = 'translateX(6px) scale(1.02)';
+            e.currentTarget.style.borderColor = color;
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!isActive) {
+            e.currentTarget.style.background = 'transparent';
+            e.currentTarget.style.transform = 'none';
+            e.currentTarget.style.borderColor = 'transparent';
+          }
+        }}
+      >
+        <span style={iconStyles}>{icon}</span>
+        {label}
+      </Link>
+    </li>
   );
 }
 

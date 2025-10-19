@@ -17,16 +17,24 @@ export default function Profile() {
   const [hasGuardian, setHasGuardian] = useState(true);
 
   useEffect(() => {
-    loadProfile();
+    // Get current user first, then load profile
+    api.auth.me().then(res => {
+      if (res.ok && res.user) {
+        loadProfile(res.user.id);
+      }
+    }).catch(err => {
+      console.error('Failed to get current user:', err);
+      setLoading(false);
+    });
   }, []);
 
-  async function loadProfile() {
+  async function loadProfile(userId: string) {
     setLoading(true);
     try {
       const [userData, badgesData, questsData] = await Promise.all([
-        api.users.get('user-1'),
-        api.users.getBadges('user-1'),
-        api.users.getQuests('user-1'),
+        api.users.get(userId),
+        api.users.getBadges?.(userId) || Promise.resolve({ badges: [] }),
+        api.users.getQuests?.(userId) || Promise.resolve({ quests: [] }),
       ]);
       setUser(userData.user);
       setBadges(badgesData.badges || []);

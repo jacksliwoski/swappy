@@ -31,10 +31,12 @@ export function calculateTradeRating(
 }
 
 /**
- * Get rating chip properties (color, label, icon)
+ * Get rating chip properties (background, text color, label, icon)
+ * Labels MUST be lowercase: great, fair, bad
  */
 export function getRatingChipProps(rating: TradeRating): {
-  color: string;
+  bgColor: string;
+  textColor: string;
   label: string;
   icon: string;
   description: string;
@@ -42,22 +44,25 @@ export function getRatingChipProps(rating: TradeRating): {
   switch (rating) {
     case 'great':
       return {
-        color: '#10b981', // green
-        label: 'Great for you',
+        bgColor: '#E6F9EF',
+        textColor: '#047857',
+        label: 'great',
         icon: '✓',
         description: 'This trade is in your favor',
       };
     case 'fair':
       return {
-        color: '#f59e0b', // yellow/amber
-        label: 'Even swap',
+        bgColor: '#FFF6E6',
+        textColor: '#B45309',
+        label: 'fair',
         icon: '≈',
         description: 'This is a balanced trade',
       };
     case 'bad':
       return {
-        color: '#ef4444', // red
-        label: 'Not a good swap',
+        bgColor: '#FDEBEC',
+        textColor: '#B91C1C',
+        label: 'bad',
         icon: '!',
         description: 'This trade is not in your favor',
       };

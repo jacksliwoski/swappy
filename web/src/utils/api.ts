@@ -1,227 +1,231 @@
-// API Client for Swappy
-// AI Server: http://localhost:3000
-// Visa/Data Server: http://localhost:7002
+// web/src/utils/api.ts
+const AI_BASE_URL =
+  (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_AI_URL) ||
+  'http://localhost:3000';
 
-const AI_BASE_URL = 'http://localhost:3000';
-const DATA_BASE_URL = 'http://localhost:7002';
+const DATA_BASE_URL =
+  (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_URL) ||
+  'http://localhost:7002';
 
-// ========== Helper Functions ==========
 async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-  });
+  try {
+    // Convert headers to plain object if they're a Headers instance
+    const headersObj: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (options?.headers) {
+      if (options.headers instanceof Headers) {
+        options.headers.forEach((value, key) => {
+          headersObj[key] = value;
+        });
+      } else if (Array.isArray(options.headers)) {
+        options.headers.forEach(([key, value]) => {
+          headersObj[key] = value;
+        });
+      } else {
+        Object.assign(headersObj, options.headers);
+      }
+    }
+    
+    const response = await fetch(url, {
+      ...options,
+      headers: headersObj
+    });
+    if (!response.ok) {
+      let err: any = { status: response.status, message: response.statusText };
+      try { err = await response.json(); } catch {}
 
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      // REMOVED: Automatic 401 redirect that was causing login loops
+      // If you get a 401, the error is thrown and calling code handles it
+      // This prevents infinite redirect loops when server is down
+
+      throw err;
+    }
+    return response.json() as Promise<T>;
+  } catch (err: any) {
+    // Network errors just get logged and re-thrown
+    if (err.status === undefined) {
+      console.error('Network error:', err);
+    }
+    throw err;
   }
-
-  return response.json();
 }
 
-// ========== AI Endpoints (existing) ==========
+// auth token helpers
+const tokenKey = 'swappy_token';
+export function setToken(t: string) { try { localStorage.setItem(tokenKey, t); } catch {} }
+export function getToken(): string | null { try { return localStorage.getItem(tokenKey); } catch { return null; } }
+export function clearToken() { try { localStorage.removeItem(tokenKey); } catch {} }
+
+function withAuth(init: RequestInit = {}): RequestInit {
+  const t = getToken();
+  if (!t) return init;
+  const headers = new Headers(init.headers || {});
+  headers.set('authorization', `Bearer ${t}`);
+  return { ...init, headers };
+}
+
 export const ai = {
-  async visionFacts(imagesBase64: string[], description?: string) {
-    return fetchJSON(`${AI_BASE_URL}/ai/vision-facts`, {
+  valuation(facts: any) {
+    return fetchJSON<any>(`${AI_BASE_URL}/ai/valuation`, {
       method: 'POST',
-      body: JSON.stringify({ imagesBase64, description }),
+      body: JSON.stringify({ facts })
     });
   },
-
-  async valuation(facts: any) {
-    return fetchJSON(`${AI_BASE_URL}/ai/valuation`, {
+  unevenScore(myValues: number[], theirValues: number[]) {
+    return fetchJSON<any>(`${AI_BASE_URL}/ai/uneven-score`, {
       method: 'POST',
-      body: JSON.stringify({ facts }),
+      body: JSON.stringify({ sideA: myValues, sideB: theirValues })
     });
   },
-
-  async unevenScore(sideA: number[], sideB: number[]) {
-    return fetchJSON(`${AI_BASE_URL}/ai/uneven-score`, {
-      method: 'POST',
-      body: JSON.stringify({ sideA, sideB }),
-    });
-  },
-
-  async moderateStream(msg: string): Promise<Response> {
+  moderateStream(msg: string) {
     return fetch(`${AI_BASE_URL}/ai/moderate/stream?msg=${encodeURIComponent(msg)}`);
   },
-
-  async meetupSuggestions(locationA: string, locationB: string, timePreference: string, preferences: string[]) {
-    return fetchJSON(`${AI_BASE_URL}/ai/meetup-suggestions`, {
+  visionFacts(imagesBase64: string[], description?: string) {
+    return fetchJSON<any>(`${AI_BASE_URL}/ai/vision-facts`, {
       method: 'POST',
-      body: JSON.stringify({ locationA, locationB, timePreference, preferences }),
+      body: JSON.stringify({ imagesBase64, description })
+    });
+  },
+  meetupSuggestions(params: {
+    locationA: string;
+    locationB: string;
+    timeWindow: string;
+    travelMode?: 'driving' | 'walking';
+    maxMinutesA?: number;
+    maxMinutesB?: number;
+    indoorPreferred?: boolean;
+    wheelchairAccess?: boolean;
+    parkingNeeded?: boolean;
+    ageContextUnder18?: boolean;
+  }) {
+    return fetchJSON<any>(`${AI_BASE_URL}/ai/meetup-suggestions`, {
+      method: 'POST',
+      body: JSON.stringify({
+        locationA: params.locationA,
+        locationB: params.locationB,
+        timeWindow: params.timeWindow || 'today 3-7pm',
+        travelMode: params.travelMode || 'driving',
+        maxMinutesA: params.maxMinutesA || 30,
+        maxMinutesB: params.maxMinutesB || 30,
+        indoorPreferred: params.indoorPreferred,
+        wheelchairAccess: params.wheelchairAccess,
+        parkingNeeded: params.parkingNeeded,
+        ageContextUnder18: params.ageContextUnder18,
+      })
     });
   },
 };
 
-// ========== Data/Visa Server Endpoints ==========
 export const api = {
-  // User endpoints
-  users: {
-    async get(userId: string) {
-      return fetchJSON(`${DATA_BASE_URL}/api/users/${userId}`);
-    },
-
-    async getPublic(userId: string) {
-      return fetchJSON(`${DATA_BASE_URL}/api/users/${userId}/public`);
-    },
-
-    async getInventory(userId: string) {
-      return fetchJSON(`${DATA_BASE_URL}/api/users/${userId}/inventory`);
-    },
-
-    async addToInventory(userId: string, item: any) {
-      return fetchJSON(`${DATA_BASE_URL}/api/users/${userId}/inventory`, {
-        method: 'POST',
-        body: JSON.stringify(item),
-      });
-    },
-
-    async updateInventoryItem(userId: string, itemId: string, updates: any) {
-      return fetchJSON(`${DATA_BASE_URL}/api/users/${userId}/inventory/${itemId}`, {
-        method: 'PUT',
-        body: JSON.stringify(updates),
-      });
-    },
-
-    async deleteInventoryItem(userId: string, itemId: string) {
-      return fetchJSON(`${DATA_BASE_URL}/api/users/${userId}/inventory/${itemId}`, {
-        method: 'DELETE',
-      });
-    },
-
-    async getBadges(userId: string) {
-      return fetchJSON(`${DATA_BASE_URL}/api/users/${userId}/badges`);
-    },
-
-    async getQuests(userId: string) {
-      return fetchJSON(`${DATA_BASE_URL}/api/users/${userId}/quests`);
-    },
-
-    async awardXP(userId: string, xp: number, reason: string) {
-      return fetchJSON(`${DATA_BASE_URL}/api/users/${userId}/xp`, {
-        method: 'POST',
-        body: JSON.stringify({ xp, reason }),
-      });
-    },
-  },
-
-  // Discover/Browse endpoints
-  discover: {
-    async browse(filters?: {
-      category?: string;
-      condition?: string;
-      tradeValue?: 'great' | 'fair' | 'bad';
-      distance?: string;
-      sort?: string;
-      search?: string;
+  auth: {
+    register(payload: {
+      email: string;
+      password: string;
+      age: number;
+      guardianName: string;
+      guardianEmail: string;
+      location?: string;
+      timeWindow?: string;
+      travelMode?: string;
+      maxMinutes?: number;
+      indoorPreferred?: boolean;
+      wheelchairAccess?: boolean;
+      parkingNeeded?: boolean;
+      categoryInterests?: string[];
     }) {
-      const params = new URLSearchParams();
-      if (filters) {
-        Object.entries(filters).forEach(([key, value]) => {
-          if (value) params.append(key, value);
-        });
-      }
-      const query = params.toString();
-      return fetchJSON(`${DATA_BASE_URL}/api/discover${query ? `?${query}` : ''}`);
+      return fetchJSON<{ ok: boolean; user: any; token: string }>(`${DATA_BASE_URL}/api/auth/register`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    },
+    login(payload: { email: string; password: string }) {
+      return fetchJSON<{ ok: boolean; user: any; token: string }>(`${DATA_BASE_URL}/api/auth/login`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    },
+    forgot(email: string) {
+      return fetchJSON<{ ok: boolean }>(`${DATA_BASE_URL}/api/auth/forgot`, {
+        method: 'POST',
+        body: JSON.stringify({ email })
+      });
+    },
+    reset(token: string, newPassword: string) {
+      return fetchJSON<{ ok: boolean }>(`${DATA_BASE_URL}/api/auth/reset`, {
+        method: 'POST',
+        body: JSON.stringify({ token, newPassword })
+      });
+    },
+    me() {
+      return fetchJSON<{ ok: boolean; user?: any }>(`${DATA_BASE_URL}/api/auth/me`, withAuth());
     },
   },
 
-  // Trade endpoints
+  users: {
+    get(id: string) {
+      return fetchJSON<any>(`${DATA_BASE_URL}/api/users/${id}`, withAuth());
+    },
+    getInventory(id: string) {
+      return fetchJSON<any>(`${DATA_BASE_URL}/api/users/${id}/inventory`, withAuth());
+    },
+    addInventoryItem(id: string, item: any) {
+      return fetchJSON<any>(`${DATA_BASE_URL}/api/users/${id}/inventory`, {
+        ...withAuth(),
+        method: 'POST',
+        body: JSON.stringify(item)
+      });
+    },
+    updateInventoryItem(userId: string, itemId: string, updates: any) {
+      return fetchJSON<any>(`${DATA_BASE_URL}/api/users/${userId}/inventory/${itemId}`, {
+        ...withAuth(),
+        method: 'PUT',
+        body: JSON.stringify(updates)
+      });
+    },
+    deleteInventoryItem(userId: string, itemId: string) {
+      return fetchJSON<any>(`${DATA_BASE_URL}/api/users/${userId}/inventory/${itemId}`, {
+        ...withAuth(),
+        method: 'DELETE'
+      });
+    },
+    updateProfile(id: string, updates: any) {
+      return fetchJSON<any>(`${DATA_BASE_URL}/api/users/${id}`, {
+        ...withAuth(),
+        method: 'PUT',
+        body: JSON.stringify(updates)
+      });
+    },
+  },
+
+  discover: {
+    browse(filters: any) {
+      // Mock for now - returns empty
+      return Promise.resolve({ items: [] });
+    },
+  },
+
   trades: {
-    async getDraft(userId: string) {
-      return fetchJSON(`${DATA_BASE_URL}/api/trades/draft/${userId}`);
+    getDraft(userId: string) {
+      // Mock for now
+      return Promise.resolve(null);
     },
-
-    async saveDraft(trade: any) {
-      return fetchJSON(`${DATA_BASE_URL}/api/trades/draft`, {
-        method: 'POST',
-        body: JSON.stringify(trade),
-      });
+    saveDraft(draft: any) {
+      // Mock for now
+      return Promise.resolve({ ok: true });
     },
-
-    async propose(trade: any) {
-      return fetchJSON(`${DATA_BASE_URL}/api/trades/propose`, {
-        method: 'POST',
-        body: JSON.stringify(trade),
-      });
-    },
-
-    async get(userId: string) {
-      return fetchJSON(`${DATA_BASE_URL}/api/trades/${userId}`);
-    },
-
-    async accept(tradeId: string) {
-      return fetchJSON(`${DATA_BASE_URL}/api/trades/${tradeId}/accept`, {
-        method: 'PUT',
-      });
-    },
-
-    async decline(tradeId: string) {
-      return fetchJSON(`${DATA_BASE_URL}/api/trades/${tradeId}/decline`, {
-        method: 'PUT',
-      });
-    },
-
-    async complete(tradeId: string) {
-      return fetchJSON(`${DATA_BASE_URL}/api/trades/${tradeId}/complete`, {
-        method: 'PUT',
-      });
+    propose(trade: any) {
+      // Mock for now
+      return Promise.resolve({ ok: true });
     },
   },
 
-  // Messages endpoints
   messages: {
-    async getConversations(userId: string) {
-      return fetchJSON(`${DATA_BASE_URL}/api/messages/${userId}`);
+    getConversations(userId: string) {
+      // Mock for now
+      return Promise.resolve({ conversations: [] });
     },
-
-    async send(conversationId: string, fromUserId: string, toUserId: string, text: string) {
-      return fetchJSON(`${DATA_BASE_URL}/api/messages`, {
-        method: 'POST',
-        body: JSON.stringify({ conversationId, fromUserId, toUserId, text }),
-      });
-    },
-
-    async markRead(conversationId: string) {
-      return fetchJSON(`${DATA_BASE_URL}/api/messages/${conversationId}/read`, {
-        method: 'PUT',
-      });
-    },
-  },
-
-  // Existing Visa endpoints
-  listings: {
-    async getAll() {
-      return fetchJSON(`${DATA_BASE_URL}/api/listings`);
-    },
-
-    async create(listing: any) {
-      return fetchJSON(`${DATA_BASE_URL}/api/listings`, {
-        method: 'POST',
-        body: JSON.stringify(listing),
-      });
-    },
-  },
-
-  merchants: {
-    async search(location: string, radius: number) {
-      return fetchJSON(`${DATA_BASE_URL}/api/merchants/search`, {
-        method: 'POST',
-        body: JSON.stringify({ location, radius }),
-      });
-    },
-  },
-
-  guardian: {
-    async verify(userId: string, pan: string, expMonth: string, expYear: string) {
-      return fetchJSON(`${DATA_BASE_URL}/api/users/${userId}/pav`, {
-        method: 'POST',
-        body: JSON.stringify({ pan, expMonth, expYear }),
-      });
+    send(convId: string, fromId: string, toId: string, text: string) {
+      // Mock for now
+      return Promise.resolve({ ok: true });
     },
   },
 };

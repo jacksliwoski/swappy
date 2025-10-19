@@ -8,6 +8,81 @@ const bcrypt = require('bcrypt');
 const dataDir = path.join(__dirname, '..', '..', 'data');
 const usersFile = path.join(dataDir, 'users.json');
 const resetsFile = path.join(dataDir, 'resets.json');
+const inventoryFile = path.join(dataDir, 'inventory.json');
+
+// Placeholder data for 2 demo users
+const DEMO_USERS = {
+  byEmail: {
+    'jack@swappy.demo': {
+      id: 'u_demo_1',
+      email: 'jack@swappy.demo',
+      passwordHash: '', // Will be set to bcrypt('password123')
+      age: 10,
+      guardianName: 'Sarah Martinez',
+      guardianEmail: 'sarah.m@example.com',
+      
+      // Profile data
+      location: 'Seattle, WA',
+      timeWindow: 'Weekends 10am-4pm',
+      travelMode: 'driving',
+      maxMinutes: 20,
+      indoorPreferred: false,
+      wheelchairAccess: false,
+      parkingNeeded: true,
+      isUnder18: true,
+      categoryInterests: ['LEGO sets', 'Pokemon cards', 'action figures', 'board games', 'video games'],
+      
+      // Trading stats
+      username: 'jack',
+      avatar: '🦖',
+      level: 3,
+      xp: 450,
+      xpToNextLevel: 500,
+      hasGuardian: true,
+      createdAt: '2025-01-15T10:00:00.000Z'
+    },
+    'anderson@swappy.demo': {
+      id: 'u_demo_2',
+      email: 'anderson@swappy.demo',
+      passwordHash: '', // Will be set to bcrypt('password123')
+      age: 12,
+      guardianName: 'Michael Anderson',
+      guardianEmail: 'mike.anderson@example.com',
+      
+      // Profile data
+      location: 'Bellevue Downtown',
+      timeWindow: 'After school 3-7pm',
+      travelMode: 'walking',
+      maxMinutes: 15,
+      indoorPreferred: true,
+      wheelchairAccess: false,
+      parkingNeeded: false,
+      isUnder18: true,
+      categoryInterests: ['sports cards', 'Funko Pops', 'Marvel figures', 'trading card games', 'art supplies'],
+      
+      // Trading stats
+      username: 'anderson',
+      avatar: '🎮',
+      level: 5,
+      xp: 820,
+      xpToNextLevel: 1000,
+      hasGuardian: true,
+      createdAt: '2025-01-10T14:30:00.000Z'
+    }
+  },
+  byId: {}
+};
+
+// Initialize demo users with hashed passwords
+async function initializeDemoUsers() {
+  const hash = await bcrypt.hash('password123', 12);
+  DEMO_USERS.byEmail['jack@swappy.demo'].passwordHash = hash;
+  DEMO_USERS.byEmail['anderson@swappy.demo'].passwordHash = hash;
+  
+  // Set up byId index
+  DEMO_USERS.byId['u_demo_1'] = DEMO_USERS.byEmail['jack@swappy.demo'];
+  DEMO_USERS.byId['u_demo_2'] = DEMO_USERS.byEmail['anderson@swappy.demo'];
+}
 
 // ensure files exist
 function ensureFile(file, initialJson) {
@@ -16,13 +91,23 @@ function ensureFile(file, initialJson) {
     fs.writeFileSync(file, JSON.stringify(initialJson, null, 2));
   }
 }
-ensureFile(usersFile, { byEmail: {}, byId: {} });
-ensureFile(resetsFile, { tokens: {} });
+
+// Initialize with demo users
+(async () => {
+  await initializeDemoUsers();
+  ensureFile(usersFile, DEMO_USERS);
+  ensureFile(resetsFile, { tokens: {} });
+  ensureFile(inventoryFile, { items: [] });
+  console.log('📚 Demo database initialized with 2 users:');
+  console.log('   jack@swappy.demo / password123');
+  console.log('   anderson@swappy.demo / password123');
+})();
 
 async function readJson(file) {
   const text = await fsp.readFile(file, 'utf8');
   return JSON.parse(text);
 }
+
 async function writeJson(file, data) {
   const tmp = file + '.tmp';
   await fsp.writeFile(tmp, JSON.stringify(data, null, 2), 'utf8');
@@ -30,13 +115,32 @@ async function writeJson(file, data) {
 }
 
 // ---- Users ----
-async function createUser({ email, password, age, guardianName, guardianEmail }) {
+async function createUser({ 
+  email, 
+  password, 
+  age, 
+  guardianName, 
+  guardianEmail,
+  location = '',
+  timeWindow = '',
+  travelMode = 'driving',
+  maxMinutes = 20,
+  indoorPreferred = false,
+  wheelchairAccess = false,
+  parkingNeeded = false,
+  categoryInterests = []
+}) {
   const db = await readJson(usersFile);
   const lower = String(email).trim().toLowerCase();
   if (db.byEmail[lower]) throw new Error('email_in_use');
 
   const id = 'u_' + Date.now();
   const passwordHash = await bcrypt.hash(password, 12);
+  
+  // Generate kid-friendly username and avatar
+  const username = 'Trader' + Math.floor(Math.random() * 10000);
+  const avatars = ['🦖', '🎮', '🚀', '🎨', '⚽', '🎪', '🦄', '🎸', '🏀', '🎯'];
+  const avatar = avatars[Math.floor(Math.random() * avatars.length)];
 
   const user = {
     id,
@@ -45,6 +149,25 @@ async function createUser({ email, password, age, guardianName, guardianEmail })
     age: Number(age),
     guardianName: guardianName?.trim() || '',
     guardianEmail: guardianEmail?.trim().toLowerCase() || '',
+    
+    // Profile data
+    location: location?.trim() || '',
+    timeWindow: timeWindow?.trim() || '',
+    travelMode: travelMode || 'driving',
+    maxMinutes: Number(maxMinutes) || 20,
+    indoorPreferred: Boolean(indoorPreferred),
+    wheelchairAccess: Boolean(wheelchairAccess),
+    parkingNeeded: Boolean(parkingNeeded),
+    isUnder18: Number(age) < 18,
+    categoryInterests: Array.isArray(categoryInterests) ? categoryInterests : [],
+    
+    // Trading stats
+    username,
+    avatar,
+    level: 1,
+    xp: 0,
+    xpToNextLevel: 50,
+    hasGuardian: true,
     createdAt: new Date().toISOString()
   };
 
@@ -63,6 +186,14 @@ async function findUserByEmail(email) {
   return u;
 }
 
+async function findUserById(id) {
+  const db = await readJson(usersFile);
+  const u = db.byId[id] || null;
+  if (!u) return null;
+  const { passwordHash, ...publicUser } = u;
+  return publicUser;
+}
+
 async function verifyPassword(user, password) {
   return bcrypt.compare(password || '', user.passwordHash);
 }
@@ -75,6 +206,29 @@ async function setUserPassword(email, newPassword) {
   u.passwordHash = await bcrypt.hash(newPassword, 12);
   await writeJson(usersFile, db);
   return true;
+}
+
+async function updateUserProfile(id, updates) {
+  const db = await readJson(usersFile);
+  const u = db.byId[id];
+  if (!u) throw new Error('user_not_found');
+  
+  // Allow updating these fields
+  const allowed = [
+    'location', 'timeWindow', 'travelMode', 'maxMinutes',
+    'indoorPreferred', 'wheelchairAccess', 'parkingNeeded',
+    'categoryInterests', 'username', 'avatar'
+  ];
+  
+  for (const key of allowed) {
+    if (updates[key] !== undefined) {
+      u[key] = updates[key];
+    }
+  }
+  
+  await writeJson(usersFile, db);
+  const { passwordHash, ...publicUser } = u;
+  return publicUser;
 }
 
 // ---- Reset tokens ----
@@ -93,11 +247,62 @@ async function useResetToken(token) {
   return rec;
 }
 
+// ---- Inventory ----
+async function addInventoryItem(userId, item) {
+  const db = await readJson(inventoryFile);
+  const newItem = {
+    id: 'item_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+    userId,
+    ...item,
+    createdAt: new Date().toISOString()
+  };
+  db.items.push(newItem);
+  await writeJson(inventoryFile, db);
+  return newItem;
+}
+
+async function getUserInventory(userId) {
+  const db = await readJson(inventoryFile);
+  return db.items.filter(item => item.userId === userId);
+}
+
+async function getInventoryItem(itemId) {
+  const db = await readJson(inventoryFile);
+  return db.items.find(item => item.id === itemId) || null;
+}
+
+async function updateInventoryItem(itemId, updates) {
+  const db = await readJson(inventoryFile);
+  const idx = db.items.findIndex(item => item.id === itemId);
+  if (idx === -1) throw new Error('item_not_found');
+  
+  db.items[idx] = { ...db.items[idx], ...updates };
+  await writeJson(inventoryFile, db);
+  return db.items[idx];
+}
+
+async function deleteInventoryItem(itemId) {
+  const db = await readJson(inventoryFile);
+  const idx = db.items.findIndex(item => item.id === itemId);
+  if (idx === -1) throw new Error('item_not_found');
+  
+  db.items.splice(idx, 1);
+  await writeJson(inventoryFile, db);
+  return true;
+}
+
 module.exports = {
   createUser,
   findUserByEmail,
+  findUserById,
   verifyPassword,
   setUserPassword,
+  updateUserProfile,
   saveResetToken,
-  useResetToken
+  useResetToken,
+  addInventoryItem,
+  getUserInventory,
+  getInventoryItem,
+  updateInventoryItem,
+  deleteInventoryItem
 };

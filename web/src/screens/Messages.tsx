@@ -5,6 +5,8 @@ import UserAvatar from '../components/cards/UserAvatar';
 import SafetyBanner from '../components/ui/SafetyBanner';
 import Button from '../components/ui/Button';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
+import MeetupAssistant, { MeetupDetails } from '../components/meetup/MeetupAssistant';
+import { detectMeetupIntent, detectUnsafeBehavior } from '../utils/meetupDetection';
 import type { Conversation, Message, User, ModerationResult } from '../types';
 
 export default function Messages() {
@@ -16,21 +18,22 @@ export default function Messages() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [moderationWarning, setModerationWarning] = useState<ModerationResult | null>(null);
+  const [showMeetupAssistant, setShowMeetupAssistant] = useState(false);
+  const [showPlanMeetupButton, setShowPlanMeetupButton] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const currentUser: User = {
-    id: 'user-1',
-    username: 'You',
-    avatar: '😊',
-    level: 1,
-    xp: 0,
-    xpToNextLevel: 50,
-    hasGuardian: true,
-    createdAt: new Date().toISOString(),
-  };
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   useEffect(() => {
-    loadConversations();
+    // Get current user first, then load conversations
+    api.auth.me().then(res => {
+      if (res.ok && res.user) {
+        setCurrentUser(res.user);
+        loadConversations(res.user.id);
+      }
+    }).catch(err => {
+      console.error('Failed to get current user:', err);
+      setLoading(false);
+    });
   }, []);
 
   useEffect(() => {
@@ -43,10 +46,33 @@ export default function Messages() {
     scrollToBottom();
   }, [messages]);
 
-  async function loadConversations() {
+  // Watch for meetup intent
+  useEffect(() => {
+    if (newMessage || messages.length > 0) {
+      const hasIntent = detectMeetupIntent(newMessage) || 
+        messages.some(msg => detectMeetupIntent(msg.text));
+      const hasUnsafe = detectUnsafeBehavior(newMessage);
+
+      if (hasUnsafe) {
+        setModerationWarning({
+          action: 'warn',
+          reason: 'Do not share payment or contact info. Stay on the platform.',
+          severity: 'medium',
+          tip: 'Keep all transactions within the platform for your safety.',
+          tags: ['payment', 'contact'],
+        });
+      }
+
+      if (hasIntent && !hasUnsafe) {
+        setShowMeetupAssistant(true);
+      }
+    }
+  }, [newMessage, messages]);
+
+  async function loadConversations(userId: string) {
     setLoading(true);
     try {
-      const data = await api.messages.getConversations('user-1');
+      const data = await api.messages.getConversations(userId);
       setConversations(data.conversations || []);
       
       if (!selectedConvId && data.conversations?.length > 0) {
@@ -149,6 +175,17 @@ export default function Messages() {
     const now = new Date();
     const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
     setNewMessage(prev => prev + `\n🕐 How about ${timeStr}?`);
+  }
+
+  function handleInsertMeetupToChat(message: string) {
+    setNewMessage(message);
+    setShowMeetupAssistant(false);
+    setShowPlanMeetupButton(true);
+  }
+
+  function handleDismissMeetupAssistant() {
+    setShowMeetupAssistant(false);
+    setShowPlanMeetupButton(true);
   }
 
   if (loading) {
@@ -313,6 +350,30 @@ export default function Messages() {
                   message={moderationWarning.tip}
                   tags={moderationWarning.tags}
                 />
+              </div>
+            )}
+
+            {/* Meetup Assistant */}
+            {showMeetupAssistant && (
+              <div style={{ padding: '0 var(--space-4) var(--space-2)' }}>
+                <MeetupAssistant
+                  isUnder18={currentUser.hasGuardian}
+                  onInsertToChat={handleInsertMeetupToChat}
+                  onDismiss={handleDismissMeetupAssistant}
+                />
+              </div>
+            )}
+
+            {/* Plan Meetup Button */}
+            {showPlanMeetupButton && !showMeetupAssistant && (
+              <div style={{ padding: '0 var(--space-4) var(--space-2)' }}>
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowMeetupAssistant(true)}
+                  style={{ width: '100%' }}
+                >
+                  📍 Plan meet-up
+                </Button>
               </div>
             )}
 

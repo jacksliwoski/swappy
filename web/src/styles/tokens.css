@@ -1,63 +1,11 @@
-/* ========== Swappy Design System ========== */
-/* Kid-friendly, bright but gentle palette */
+/* ========== Swappy Kids Theme ========== */
+/* Playful, colorful, kid-friendly design inspired by PBS KIDS, Funbrain, Starfall, Cool Math Games */
 
 :root {
-  /* Colors - Bright but gentle */
-  --color-teal: #14b8a6;
-  --color-teal-light: #5eead4;
-  --color-teal-dark: #0f766e;
-
-  --color-lilac: #c084fc;
-  --color-lilac-light: #e9d5ff;
-  --color-lilac-dark: #9333ea;
-
-  --color-sunshine: #fbbf24;
-  --color-sunshine-light: #fef3c7;
-  --color-sunshine-dark: #f59e0b;
-
-  --color-coral: #fb7185;
-  --color-coral-light: #fecdd3;
-  --color-coral-dark: #f43f5e;
-
-  /* Semantic colors */
-  --color-primary: var(--color-teal);
-  --color-secondary: var(--color-lilac);
-  --color-accent: var(--color-coral);
-  --color-success: #10b981;
-  --color-warning: #f59e0b;
-  --color-error: #ef4444;
-
-  /* Rating colors */
-  --color-rating-great: #10b981;
-  --color-rating-fair: #f59e0b;
-  --color-rating-bad: #ef4444;
-
-  /* Neutral colors */
-  --color-white: #ffffff;
-  --color-gray-50: #f9fafb;
-  --color-gray-100: #f3f4f6;
-  --color-gray-200: #e5e7eb;
-  --color-gray-300: #d1d5db;
-  --color-gray-400: #9ca3af;
-  --color-gray-500: #6b7280;
-  --color-gray-600: #4b5563;
-  --color-gray-700: #374151;
-  --color-gray-800: #1f2937;
-  --color-gray-900: #111827;
-
-  /* Typography */
-  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
-  --font-family-display: 'Nunito', 'Comic Sans MS', cursive, sans-serif;
-
-  /* Font sizes - Larger for kids */
-  --text-xs: 12px;
-  --text-sm: 14px;
-  --text-base: 16px;
-  --text-lg: 18px;
-  --text-xl: 20px;
-  --text-2xl: 24px;
-  --text-3xl: 30px;
-  --text-4xl: 36px;
+  /* ========== Typography ========== */
+  /* Fonts: Fredoka for headings (bubbly), Nunito for body (legible) */
+  --font-display: 'Fredoka', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-body: 'Nunito', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 
   /* Font weights */
   --font-normal: 400;
@@ -65,40 +13,125 @@
   --font-semibold: 600;
   --font-bold: 700;
 
-  /* Spacing */
+  /* Type scale - kid-readable with roomy line heights */
+  --text-h1: 40px;
+  --text-h1-lh: 1.15;
+  --text-h2: 30px;
+  --text-h2-lh: 1.2;
+  --text-h3: 22px;
+  --text-h3-lh: 1.25;
+  --text-h4: 18px;
+  --text-h4-lh: 1.3;
+  --text-body: 16px;
+  --text-body-lh: 1.55;
+  --text-small: 14px;
+  --text-small-lh: 1.45;
+
+  /* ========== Colors - Optimistic & Modern ========== */
+  /* Base colors */
+  --color-bg: #F9FAFE;
+  --color-surface: #FFFFFF;
+  --color-text-1: #0F172A;
+  --color-text-2: #334155;
+  --color-border: #E6EAF2;
+
+  /* Brand colors - Mint green (playful yet modern) */
+  --color-brand: #22D3A8;
+  --color-brand-ink: #0F766E;
+  --color-brand-tint: rgba(34, 211, 168, 0.12);
+  --color-brand-border: rgba(34, 211, 168, 0.3);
+  --color-focus: #22C55E;
+
+  /* Accent colors (for variety and fun) */
+  --color-accent-blue: #60A5FA;
+  --color-accent-purple: #A78BFA;
+  --color-accent-yellow: #FACC15;
+  --color-accent-coral: #FB7185;
+
+  /* Chip/Tag background */
+  --color-chip-bg: #F1F5F9;
+
+  /* Rating colors - great/fair/bad (MUST be lowercase) */
+  --color-rating-great-bg: #E6F9EF;
+  --color-rating-great-text: #047857;
+  --color-rating-fair-bg: #FFF6E6;
+  --color-rating-fair-text: #B45309;
+  --color-rating-bad-bg: #FDEBEC;
+  --color-rating-bad-text: #B91C1C;
+
+  /* Semantic colors */
+  --color-success: #22D3A8;
+  --color-success-light: #E6F9EF;
+  --color-warning: #FACC15;
+  --color-warning-light: #FFF6E6;
+  --color-error: #FB7185;
+  --color-error-light: #FDEBEC;
+  --color-info: #60A5FA;
+  --color-info-light: #DBEAFE;
+
+  /* Extended palette for teal/lilac/green (compatibility) */
+  --color-teal: #22D3A8;
+  --color-teal-light: #A7F3D0;
+  --color-teal-dark: #0F766E;
+  --color-lilac: #A78BFA;
+  --color-lilac-light: #E9D5FF;
+  --color-lilac-dark: #7C3AED;
+  --color-green: #22C55E;
+  --color-green-light: #D1FAE5;
+  --color-green-dark: #15803D;
+
+  /* Grays */
+  --color-gray-50: #F9FAFB;
+  --color-gray-100: #F3F4F6;
+  --color-gray-200: #E5E7EB;
+  --color-gray-300: #D1D5DB;
+  --color-gray-400: #9CA3AF;
+  --color-gray-500: #6B7280;
+  --color-gray-600: #4B5563;
+  --color-gray-700: #374151;
+  --color-gray-800: #1F2937;
+  --color-gray-900: #111827;
+
+  /* ========== Spacing (8pt system with friendlier highs) ========== */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
   --space-5: 20px;
   --space-6: 24px;
+  --space-7: 28px;
   --space-8: 32px;
   --space-10: 40px;
-  --space-12: 48px;
-  --space-16: 64px;
 
-  /* Border radius - Rounded for kid-friendly feel */
-  --radius-sm: 6px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
-  --radius-full: 9999px;
+  /* ========== Border Radius - Friendly & Rounded ========== */
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-pill: 9999px;
 
-  /* Shadows - Soft */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
-  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+  /* ========== Shadows - Sticker-like & Soft ========== */
+  --shadow-s1: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-s2: 0 8px 18px rgba(15, 23, 42, 0.10);
+  --shadow-sticker: 0 2px 8px rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.08);
 
-  /* Transitions */
-  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-base: 300ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-slow: 500ms cubic-bezier(0.4, 0, 0.2, 1);
+  /* ========== Transitions - Snappy & Playful ========== */
+  --transition-fast: 120ms ease-out;
+  --transition-base: 180ms ease-out;
+  --transition-slow: 300ms ease-out;
 
-  /* Layout */
-  --container-max: 1280px;
+  /* ========== Layout ========== */
+  --container-max: 1200px;
+  --container-gutter: 24px;
   --header-height: 64px;
   --drawer-width: 280px;
+
+  /* ========== Control Sizes ========== */
+  --control-height-desktop: 40px;
+  --control-height-mobile: 44px;
+  --search-height: 48px;
+  --avatar-sm: 36px;
+  --avatar-md: 48px;
+  --avatar-lg: 64px;
 }
 
 /* ========== Base Styles ========== */
@@ -109,34 +142,56 @@
 }
 
 body {
-  font-family: var(--font-family);
-  font-size: var(--text-base);
-  line-height: 1.6;
-  color: var(--color-gray-800);
-  background: var(--color-gray-50);
+  font-family: var(--font-body);
+  font-size: var(--text-body);
+  line-height: var(--text-body-lh);
+  color: var(--color-text-2);
+  background: var(--color-bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Typography hierarchy - Fredoka for headings */
 h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-family-display);
-  font-weight: var(--font-bold);
-  line-height: 1.2;
-  color: var(--color-gray-900);
+  font-family: var(--font-display);
+  color: var(--color-text-1);
+  margin: 0;
 }
 
-h1 { font-size: var(--text-4xl); }
-h2 { font-size: var(--text-3xl); }
-h3 { font-size: var(--text-2xl); }
-h4 { font-size: var(--text-xl); }
-h5 { font-size: var(--text-lg); }
-h6 { font-size: var(--text-base); }
+h1 {
+  font-size: var(--text-h1);
+  line-height: var(--text-h1-lh);
+  font-weight: var(--font-bold);
+}
+
+h2 {
+  font-size: var(--text-h2);
+  line-height: var(--text-h2-lh);
+  font-weight: var(--font-bold);
+}
+
+h3 {
+  font-size: var(--text-h3);
+  line-height: var(--text-h3-lh);
+  font-weight: var(--font-semibold);
+}
+
+h4 {
+  font-size: var(--text-h4);
+  line-height: var(--text-h4-lh);
+  font-weight: var(--font-semibold);
+}
+
+p {
+  margin: 0;
+}
 
 button {
   font-family: inherit;
   cursor: pointer;
   border: none;
   background: none;
+  padding: 0;
 }
 
 input, textarea, select {
@@ -151,86 +206,115 @@ img {
 }
 
 a {
-  color: var(--color-primary);
+  color: var(--color-brand);
   text-decoration: none;
   transition: color var(--transition-fast);
 }
 
 a:hover {
-  color: var(--color-teal-dark);
+  color: var(--color-brand-ink);
+}
+
+/* Focus visible ring - cheerful green */
+*:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 /* ========== Utility Classes ========== */
 .container {
   max-width: var(--container-max);
   margin: 0 auto;
-  padding: 0 var(--space-4);
+  padding: 0 var(--container-gutter);
 }
 
-.card {
-  background: var(--color-white);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
-  padding: var(--space-6);
-}
-
-.chip {
-  display: inline-flex;
-  align-items: center;
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-full);
-  font-size: var(--text-sm);
-  font-weight: var(--font-medium);
-  background: var(--color-gray-100);
-  color: var(--color-gray-700);
-}
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-3) var(--space-6);
-  border-radius: var(--radius-lg);
-  font-size: var(--text-base);
-  font-weight: var(--font-semibold);
-  transition: all var(--transition-fast);
-  min-height: 48px; /* Big tap targets for kids */
-  gap: var(--space-2);
-}
-
-.btn-primary {
-  background: var(--color-primary);
-  color: var(--color-white);
-}
-
-.btn-primary:hover {
-  background: var(--color-teal-dark);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
-}
-
-.btn-secondary {
-  background: var(--color-white);
-  color: var(--color-primary);
-  border: 2px solid var(--color-primary);
-}
-
-.btn-secondary:hover {
-  background: var(--color-gray-50);
-}
-
-/* Skeleton loader */
-@keyframes skeleton-loading {
+/* ========== Skeleton Loader ========== */
+@keyframes shimmer {
   0% {
-    background-position: -200px 0;
+    background-position: -468px 0;
   }
   100% {
-    background-position: calc(200px + 100%) 0;
+    background-position: 468px 0;
   }
 }
 
 .skeleton {
-  background: linear-gradient(90deg, #f0f0f0 0px, #f8f8f8 40px, #f0f0f0 80px);
-  background-size: 200px 100%;
-  animation: skeleton-loading 1.5s ease-in-out infinite;
+  background: linear-gradient(
+    90deg,
+    var(--color-gray-200) 0px,
+    var(--color-gray-100) 40px,
+    var(--color-gray-200) 80px
+  );
+  background-size: 468px 100%;
+  animation: shimmer 1.2s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+
+.skeleton-text {
+  height: 16px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+}
+
+.skeleton-heading {
+  height: 24px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+}
+
+.skeleton-image {
+  aspect-ratio: 4/3;
+  border-radius: var(--radius-sm);
+}
+
+/* ========== Confetti Animation ========== */
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+.confetti-piece {
+  position: fixed;
+  width: 10px;
+  height: 10px;
+  animation: confetti-fall 3s ease-out forwards;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* ========== Mobile Adjustments ========== */
+@media (max-width: 768px) {
+  :root {
+    --text-h1: 34px;
+    --text-h2: 26px;
+    --text-h3: 20px;
+    --container-gutter: 16px;
+  }
+  
+  body {
+    font-size: var(--text-body);
+  }
+}
+
+/* ========== Reduced Motion ========== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  
+  .confetti-piece {
+    display: none;
+  }
 }

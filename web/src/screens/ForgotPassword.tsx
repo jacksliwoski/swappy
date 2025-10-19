@@ -4,27 +4,27 @@ import { api } from '../utils/api';
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
   const [msg, setMsg] = useState('');
-  const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setMsg('');
+    setSuccess(false);
     setLoading(true);
-    
     try {
       await api.auth.forgot(email);
       setSuccess(true);
-      setMsg('If an account exists, a reset link has been written to the server outbox.');
+      setMsg('Check your email for a reset link! (In demo mode, check the /data/outbox folder)');
     } catch (e: any) {
-      setMsg(e?.error || 'Oops! Something went wrong.');
+      setMsg(e?.error || 'Oops! Something went wrong. Try again!');
     } finally {
       setLoading(false);
     }
   }
 
   const containerStyles: CSSProperties = {
-    maxWidth: '420px',
+    maxWidth: '480px',
     margin: '0 auto',
     padding: 'var(--space-8)',
   };
@@ -35,6 +35,12 @@ export default function ForgotPassword() {
     border: '2px solid var(--color-border)',
     padding: 'var(--space-8)',
     boxShadow: 'var(--shadow-s2)',
+  };
+
+  const iconStyles: CSSProperties = {
+    fontSize: '64px',
+    textAlign: 'center',
+    marginBottom: 'var(--space-4)',
   };
 
   const titleStyles: CSSProperties = {
@@ -55,15 +61,18 @@ export default function ForgotPassword() {
     lineHeight: 'var(--text-small-lh)',
   };
 
-  const iconStyles: CSSProperties = {
-    fontSize: '48px',
-    textAlign: 'center',
-    marginBottom: 'var(--space-4)',
+  const labelStyles: CSSProperties = {
+    display: 'block',
+    fontSize: 'var(--text-small)',
+    fontFamily: 'var(--font-body)',
+    fontWeight: 'var(--font-semibold)',
+    color: 'var(--color-text-1)',
+    marginBottom: 'var(--space-2)',
   };
 
   const inputStyles: CSSProperties = {
     width: '100%',
-    padding: 'var(--space-4)',
+    padding: 'var(--space-3)',
     fontSize: 'var(--text-body)',
     fontFamily: 'var(--font-body)',
     fontWeight: 'var(--font-medium)',
@@ -87,13 +96,14 @@ export default function ForgotPassword() {
     transition: 'all var(--transition-base)',
     boxShadow: 'var(--shadow-s1)',
     opacity: loading ? 0.6 : 1,
+    marginTop: 'var(--space-2)',
   };
 
   const messageStyles: CSSProperties = {
     marginTop: 'var(--space-4)',
     padding: 'var(--space-3)',
-    background: success ? 'var(--color-success-light)' : 'var(--color-error-light)',
-    color: success ? 'var(--color-success)' : 'var(--color-error)',
+    background: success ? 'var(--color-rating-great-bg)' : 'var(--color-rating-bad-bg)',
+    color: success ? 'var(--color-rating-great-text)' : 'var(--color-rating-bad-text)',
     borderRadius: 'var(--radius-sm)',
     fontSize: 'var(--text-small)',
     fontWeight: 'var(--font-semibold)',
@@ -114,54 +124,60 @@ export default function ForgotPassword() {
     textDecoration: 'none',
   };
 
+  const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    e.currentTarget.style.borderColor = 'var(--color-brand)';
+    e.currentTarget.style.boxShadow = 'var(--shadow-s1)';
+  };
+
+  const handleInputBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    e.currentTarget.style.borderColor = 'var(--color-border)';
+    e.currentTarget.style.boxShadow = 'none';
+  };
+
   return (
     <div style={containerStyles}>
       <div style={cardStyles}>
         <div style={iconStyles}>🔑</div>
         <h1 style={titleStyles}>Forgot Password?</h1>
         <p style={subtitleStyles}>
-          No worries! We'll help you reset it.
+          No worries! We'll send you a reset link
         </p>
         
         <form onSubmit={onSubmit}>
-          <input
-            style={inputStyles}
-            type="email"
-            placeholder="Your email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            disabled={success}
-            onFocus={(e) => {
-              e.currentTarget.style.borderColor = 'var(--color-brand)';
-              e.currentTarget.style.boxShadow = 'var(--shadow-s1)';
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.borderColor = 'var(--color-border)';
-              e.currentTarget.style.boxShadow = 'none';
-            }}
-          />
+          <div>
+            <label style={labelStyles}>Your Email</label>
+            <input
+              style={inputStyles}
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              onFocus={handleInputFocus}
+              onBlur={handleInputBlur}
+            />
+          </div>
           
           <button
             style={buttonStyles}
             type="submit"
-            disabled={loading || success}
+            disabled={loading}
             onMouseEnter={(e) => {
-              if (!loading && !success) {
+              if (!loading) {
                 e.currentTarget.style.background = 'var(--color-brand-ink)';
                 e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
                 e.currentTarget.style.boxShadow = 'var(--shadow-s2)';
               }
             }}
             onMouseLeave={(e) => {
-              if (!loading && !success) {
+              if (!loading) {
                 e.currentTarget.style.background = 'var(--color-brand)';
                 e.currentTarget.style.transform = 'none';
                 e.currentTarget.style.boxShadow = 'var(--shadow-s1)';
               }
             }}
           >
-            {loading ? 'Sending...' : success ? 'Link Sent! ✓' : 'Send Reset Link 📧'}
+            {loading ? 'Sending...' : 'Send Reset Link ✉️'}
           </button>
         </form>
         
@@ -174,3 +190,4 @@ export default function ForgotPassword() {
     </div>
   );
 }
+

@@ -1,9 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ai, api } from '../utils/api';
-import VisionForm from '../components/VisionForm';
-import FactsCard from '../components/FactsCard';
-import ValuationCard from '../components/ValuationCard';
 import Confetti from '../components/ui/Confetti';
 import Button from '../components/ui/Button';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
@@ -20,6 +17,16 @@ export default function AddToInventory() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  // Get current user on mount
+  useEffect(() => {
+    api.auth.me().then(res => {
+      if (res.ok && res.user) {
+        setCurrentUser(res.user);
+      }
+    }).catch(err => console.error('Failed to get current user:', err));
+  }, []);
 
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -75,7 +82,7 @@ export default function AddToInventory() {
 
   // Step 3: Save to Inventory
   const handleSave = async () => {
-    if (!facts || !valuation) return;
+    if (!facts || !valuation || !currentUser) return;
     setLoading(true);
     setError(null);
     try {
@@ -92,12 +99,7 @@ export default function AddToInventory() {
         condition: facts.condition,
       };
 
-      await api.users.addToInventory('user-1', newItem);
-
-      // Award XP for quality photos
-      if (images.length >= 3) {
-        await api.users.awardXP('user-1', 5, 'quality_photos');
-      }
+      await api.users.addInventoryItem(currentUser.id, newItem);
 
       setShowConfetti(true);
       setTimeout(() => {
@@ -344,10 +346,10 @@ export default function AddToInventory() {
             <Button
               variant="primary"
               onClick={handleSave}
-              disabled={loading}
+              disabled={loading || !currentUser}
               style={{ flex: 2 }}
             >
-              {loading ? <LoadingSpinner /> : '✨ Add to Toy Box!'}
+              {loading ? <LoadingSpinner /> : !currentUser ? 'Loading...' : '✨ Add to Toy Box!'}
             </Button>
           </div>
         </div>

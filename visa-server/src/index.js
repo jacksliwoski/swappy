@@ -22,9 +22,7 @@ app.get('/api/health', (_req, res) => res.json({ ok: true, ts: Date.now(), mock:
 
 // routes
 app.use('/api/auth', require('./routes/auth'));
-
-// you can mount your existing routes as needed, e.g.
-// app.use('/api/users', require('./routes/users'));
+app.use('/api/users', require('./routes/users'));
 
 app.use((_req, res) => res.status(404).json({ ok: false, error: 'not_found' }));
 

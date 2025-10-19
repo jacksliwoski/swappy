@@ -21,7 +21,14 @@
       "Bash(taskkill //PID 14244 //F)",
       "Bash(curl -X POST http://localhost:7002/api/users/test-user/pav -H \"Content-Type: application/json\" -d \"{\"\"pan\"\":\"\"4957030420210454\"\",\"\"expMonth\"\":\"\"12\"\",\"\"expYear\"\":\"\"2025\"\"}\")",
       "Bash(npm install react-router-dom)",
-      "Bash(taskkill //PID 24656 //F)"
+      "Bash(taskkill //PID 24656 //F)",
+      "Bash(taskkill /PID 6932 /F)",
+      "Bash(taskkill //PID 6932 //F)",
+      "Bash(curl -X POST http://localhost:3000/ai/vision-facts -H \"Content-Type: application/json\" -d \"{\"\"imagesBase64\"\":[\"\"test\"\"],\"\"description\"\":\"\"test\"\"}\")",
+      "Bash(curl -s http://localhost:7002/api/health)",
+      "Bash(findstr :7002)",
+      "Bash(taskkill /PID 24356 /F)",
+      "Bash(taskkill //PID 24356 //F)"
     ],
     "deny": [],
     "ask": []

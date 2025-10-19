@@ -106,14 +106,16 @@ router.post('/reset', async (req, res) => {
   res.json({ ok: true });
 });
 
-router.get('/me', (req, res) => {
-  // Optional convenience endpoint
+router.get('/me', async (req, res) => {
   const hdr = req.headers.authorization || '';
   const token = hdr.startsWith('Bearer ') ? hdr.slice(7) : null;
   if (!token) return res.status(401).json({ ok: false });
   try {
     const payload = require('jsonwebtoken').verify(token, require('../config').config.jwtSecret);
-    res.json({ ok: true, user: payload });
+    const { findUserById } = require('../db/filedb');
+    const user = await findUserById(payload.id);
+    if (!user) return res.status(401).json({ ok: false, error: 'user_not_found' });
+    res.json({ ok: true, user });
   } catch {
     res.status(401).json({ ok: false });
   }

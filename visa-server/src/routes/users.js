@@ -1,121 +1,92 @@
+// src/routes/users.js
 const express = require('express');
-const { ensureUser } = require('../db/memory');
-const { pav } = require('../visaClient');
+const { 
+  findUserById, 
+  updateUserProfile,
+  addInventoryItem,
+  getUserInventory,
+  getInventoryItem,
+  updateInventoryItem,
+  deleteInventoryItem
+} = require('../db/filedb');
+const { requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Get user profile (xp/level/stats)
-router.get('/:id', (req, res) => {
-  const u = ensureUser(req.params.id);
-  res.json({ ok: true, user: u });
+// Get user by ID (public info)
+router.get('/:id', async (req, res) => {
+  try {
+    const user = await findUserById(req.params.id);
+    if (!user) return res.status(404).json({ ok: false, error: 'user_not_found' });
+    res.json(user);
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
 });
 
-// Get public user profile
-router.get('/:id/public', (req, res) => {
-  const u = ensureUser(req.params.id);
-  // Return public info only
-  res.json({
-    ok: true,
-    user: {
-      id: u.id,
-      username: u.username,
-      avatar: u.avatar,
-      level: u.level,
-      xp: u.xp,
-    },
-  });
+// Update user profile (authenticated)
+router.put('/:id', requireAuth, async (req, res) => {
+  try {
+    if (req.user.id !== req.params.id) {
+      return res.status(403).json({ ok: false, error: 'forbidden' });
+    }
+    
+    const user = await updateUserProfile(req.params.id, req.body);
+    res.json({ ok: true, user });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
 });
 
 // Get user inventory
-router.get('/:id/inventory', (req, res) => {
-  // Mock inventory
-  const mockInventory = [
-    {
-      id: 'inv-1',
-      userId: req.params.id,
-      images: ['https://via.placeholder.com/300x300/14b8a6/white?text=Item+1'],
-      title: 'My Cool Toy',
-      category: 'toys',
-      condition: 'good',
-      valuation: { estimate: { low: 20, mid: 30, high: 40 }, explanation: 'Good condition toy' },
-      addedAt: new Date().toISOString(),
-    },
-  ];
-  res.json({ ok: true, inventory: mockInventory });
-});
-
-// Add item to inventory
-router.post('/:id/inventory', (req, res) => {
-  const item = {
-    id: `inv-${Date.now()}`,
-    userId: req.params.id,
-    ...req.body,
-    addedAt: new Date().toISOString(),
-  };
-  res.json({ ok: true, item });
-});
-
-// Update inventory item
-router.put('/:id/inventory/:itemId', (req, res) => {
-  res.json({ ok: true, item: { id: req.params.itemId, ...req.body } });
-});
-
-// Delete inventory item
-router.delete('/:id/inventory/:itemId', (req, res) => {
-  res.json({ ok: true, itemId: req.params.itemId });
-});
-
-// Get user badges
-router.get('/:id/badges', (req, res) => {
-  const mockBadges = [
-    {
-      id: 'badge-1',
-      name: 'First Swap!',
-      description: 'Completed your first trade',
-      icon: '🎉',
-      earnedAt: new Date().toISOString(),
-    },
-  ];
-  res.json({ ok: true, badges: mockBadges });
-});
-
-// Get user quests
-router.get('/:id/quests', (req, res) => {
-  const mockQuests = [
-    {
-      id: 'quest-1',
-      title: 'Trade 2 different categories this week',
-      description: 'Complete trades in at least 2 different categories',
-      xpReward: 15,
-      progress: 1,
-      target: 2,
-      completed: false,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-  ];
-  res.json({ ok: true, quests: mockQuests });
-});
-
-// Award XP
-router.post('/:id/xp', (req, res) => {
-  const { xp, reason } = req.body;
-  const u = ensureUser(req.params.id);
-  u.xp = (u.xp || 0) + xp;
-  res.json({ ok: true, user: u, xpAwarded: xp, reason });
-});
-
-// Visa PAV for a user (account verification)
-router.post('/:id/pav', async (req, res) => {
+router.get('/:id/inventory', async (req, res) => {
   try {
-    const { pan, expMonth, expYear } = req.body || {};
-    if (!pan || !expMonth || !expYear) {
-      return res.status(400).json({ ok: false, error: 'pan, expMonth, expYear required' });
-    }
-    const out = await pav(pan, expMonth, expYear);
-    const ok = out.status >= 200 && out.status < 300 && !out.error;
-    res.status(ok ? 200 : (out.status || 500)).json({ ok, pav: out });
+    const items = await getUserInventory(req.params.id);
+    res.json({ ok: true, items });
   } catch (e) {
-    res.status(500).json({ ok: false, error: 'pav_failed', detail: String(e) });
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// Add item to inventory (authenticated)
+router.post('/:id/inventory', requireAuth, async (req, res) => {
+  try {
+    if (req.user.id !== req.params.id) {
+      return res.status(403).json({ ok: false, error: 'forbidden' });
+    }
+    
+    const item = await addInventoryItem(req.params.id, req.body);
+    res.json({ ok: true, item });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// Update inventory item (authenticated)
+router.put('/:id/inventory/:itemId', requireAuth, async (req, res) => {
+  try {
+    if (req.user.id !== req.params.id) {
+      return res.status(403).json({ ok: false, error: 'forbidden' });
+    }
+    
+    const item = await updateInventoryItem(req.params.itemId, req.body);
+    res.json({ ok: true, item });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// Delete inventory item (authenticated)
+router.delete('/:id/inventory/:itemId', requireAuth, async (req, res) => {
+  try {
+    if (req.user.id !== req.params.id) {
+      return res.status(403).json({ ok: false, error: 'forbidden' });
+    }
+    
+    await deleteInventoryItem(req.params.itemId);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
   }
 });
 
