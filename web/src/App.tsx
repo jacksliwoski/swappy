@@ -1,127 +1,13 @@
 import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { useState } from 'react';
-
-// Temporary placeholder screens
-function Discover() {
-  return (
-    <div style={{ padding: '2rem' }}>
-      <h1 style={{ color: 'var(--color-primary)', marginBottom: '1rem' }}>🔍 Discover</h1>
-      <p style={{ fontSize: '1.125rem', color: 'var(--color-gray-600)' }}>
-        Browse and discover items from other users. Coming soon!
-      </p>
-      <div className="card" style={{ marginTop: '2rem', maxWidth: '400px' }}>
-        <h3 style={{ marginBottom: '1rem' }}>Featured Item</h3>
-        <div style={{
-          width: '100%',
-          height: '200px',
-          background: 'var(--color-teal-light)',
-          borderRadius: 'var(--radius-md)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '3rem',
-          marginBottom: '1rem',
-        }}>
-          🎮
-        </div>
-        <h4>Cool Game Console</h4>
-        <div style={{ display: 'flex', gap: '0.5rem', margin: '0.5rem 0' }}>
-          <span className="chip">games</span>
-          <span className="chip">good</span>
-        </div>
-        <button className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }}>
-          Add to Trade
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function Inventory() {
-  return (
-    <div style={{ padding: '2rem' }}>
-      <h1 style={{ color: 'var(--color-primary)', marginBottom: '1rem' }}>📦 Your Toy Box</h1>
-      <p style={{ fontSize: '1.125rem', color: 'var(--color-gray-600)', marginBottom: '2rem' }}>
-        Your inventory is empty—let's fill it up! 📦
-      </p>
-      <Link to="/add">
-        <button className="btn btn-primary">
-          ➕ Add to Inventory
-        </button>
-      </Link>
-    </div>
-  );
-}
-
-function Profile() {
-  return (
-    <div style={{ padding: '2rem' }}>
-      <h1 style={{ color: 'var(--color-primary)', marginBottom: '1rem' }}>👤 Profile & XP</h1>
-
-      <div className="card" style={{ maxWidth: '500px', marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
-          <div style={{
-            width: '64px',
-            height: '64px',
-            borderRadius: 'var(--radius-full)',
-            background: 'var(--color-lilac-light)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '2rem',
-          }}>
-            😊
-          </div>
-          <div>
-            <h2 style={{ marginBottom: '0.25rem' }}>You</h2>
-            <span className="chip" style={{ background: 'var(--color-primary)', color: 'white' }}>
-              Lv1 Beginner
-            </span>
-          </div>
-        </div>
-
-        <div style={{ marginBottom: '1.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-            <span style={{ fontWeight: 'var(--font-semibold)' }}>XP Progress</span>
-            <span style={{ color: 'var(--color-gray-600)' }}>0 / 50 XP</span>
-          </div>
-          <div style={{
-            width: '100%',
-            height: '12px',
-            background: 'var(--color-gray-200)',
-            borderRadius: 'var(--radius-full)',
-          }}>
-            <div style={{
-              width: '0%',
-              height: '100%',
-              background: 'var(--color-primary)',
-              borderRadius: 'var(--radius-full)',
-            }}></div>
-          </div>
-        </div>
-
-        <h3 style={{ marginBottom: '1rem' }}>📛 Badges</h3>
-        <p style={{ color: 'var(--color-gray-600)' }}>Complete trades to earn badges!</p>
-      </div>
-
-      <div className="card" style={{ maxWidth: '500px' }}>
-        <h3 style={{ marginBottom: '1rem' }}>🎯 Weekly Quests</h3>
-        <p style={{ color: 'var(--color-gray-600)' }}>Complete quests to earn bonus XP!</p>
-      </div>
-    </div>
-  );
-}
-
-function ComingSoon({ title }: { title: string }) {
-  return (
-    <div style={{ padding: '2rem', textAlign: 'center' }}>
-      <h1 style={{ color: 'var(--color-primary)', marginBottom: '1rem' }}>{title}</h1>
-      <p style={{ fontSize: '1.125rem', color: 'var(--color-gray-600)' }}>
-        Coming soon! 🚀
-      </p>
-    </div>
-  );
-}
+import Discover from './screens/Discover';
+import Inventory from './screens/Inventory';
+import AddToInventory from './screens/AddToInventory';
+import TradeBuilder from './screens/TradeBuilder';
+import Messages from './screens/Messages';
+import Profile from './screens/Profile';
+import Settings from './screens/Settings';
+import MeetupSuggestions from './components/MeetupSuggestions';
 
 function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -247,12 +133,12 @@ function App() {
             <Route path="/" element={<Navigate to="/discover" replace />} />
             <Route path="/discover" element={<Discover />} />
             <Route path="/inventory" element={<Inventory />} />
-            <Route path="/add" element={<ComingSoon title="➕ Add to Inventory" />} />
-            <Route path="/trades/:tradeId?" element={<ComingSoon title="🔄 Trade Builder" />} />
-            <Route path="/messages/:conversationId?" element={<ComingSoon title="💬 Messages" />} />
-            <Route path="/meetup" element={<ComingSoon title="📍 Safe Meetup" />} />
+            <Route path="/add" element={<AddToInventory />} />
+            <Route path="/trades/:tradeId?" element={<TradeBuilder />} />
+            <Route path="/messages/:conversationId?" element={<Messages />} />
+            <Route path="/meetup" element={<MeetupSuggestions />} />
             <Route path="/profile" element={<Profile />} />
-            <Route path="/settings" element={<ComingSoon title="⚙️ Settings" />} />
+            <Route path="/settings" element={<Settings />} />
           </Routes>
         </main>
       </div>

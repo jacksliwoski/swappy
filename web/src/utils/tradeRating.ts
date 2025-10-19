@@ -95,18 +95,12 @@ export function getBalancingSuggestion(diff: number): string | null {
     return null; // Fair enough, no suggestion needed
   }
 
-  const absD
-
-iff = Math.abs(diff);
+  const absDiff = Math.abs(diff);
   if (diff > 0) {
     // Other side needs to add
-    return `Ask for ~${formatValue(absD
-
-iff)} more or another small item`;
+    return `Ask for ~${formatValue(absDiff)} more or another small item`;
   } else {
     // Viewer needs to add
-    return `Add ~${formatValue(absD
-
-iff)} or another small item`;
+    return `Add ~${formatValue(absDiff)} or another small item`;
   }
 }

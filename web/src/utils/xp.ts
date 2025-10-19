@@ -48,6 +48,8 @@ export function calculateLevel(totalXP: number): {
   level: number;
   levelName: string;
   xpToNextLevel: number;
+  xpInCurrentLevel: number;
+  xpForNextLevel: number;
   progressPercent: number;
 } {
   // Find the highest level the user has reached
@@ -70,6 +72,8 @@ export function calculateLevel(totalXP: number): {
     level: currentLevel.level,
     levelName: currentLevel.name,
     xpToNextLevel: nextLevel.xpRequired,
+    xpInCurrentLevel,
+    xpForNextLevel: xpNeededForNext,
     progressPercent: Math.min(100, progressPercent),
   };
 }
@@ -94,11 +98,12 @@ export function calculateTradeXP(rating: TradeRating): number {
  * Calculate estimated XP for a proposed trade
  */
 export function estimateTradeXP(
-  rating: TradeRating,
+  tradeValue: number,
   hasPublicMeetup: boolean = false,
   hasGuardian: boolean = false
 ): number {
-  let xp = calculateTradeXP(rating);
+  // Base XP scales with trade value
+  let xp = Math.min(XP_AWARDS.COMPLETE_TRADE, Math.floor(tradeValue / 10));
 
   if (hasPublicMeetup) {
     xp += XP_AWARDS.PUBLIC_MEETUP;
