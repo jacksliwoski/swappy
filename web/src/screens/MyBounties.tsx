@@ -27,9 +27,33 @@ interface Bounty {
   createdAt: string;
 }
 
+interface Claim {
+  id: string;
+  bountyId: string;
+  claimerId: string;
+  status: string;
+  proofOfPossession: {
+    images: string[];
+    description: string;
+    location: string;
+    foundDate: string;
+  };
+  claimer?: {
+    id: string;
+    username: string;
+    avatar: string;
+    level: number;
+  };
+  createdAt: string;
+}
+
 export default function MyBounties() {
   const [bounties, setBounties] = useState<Bounty[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedBounty, setSelectedBounty] = useState<Bounty | null>(null);
+  const [claims, setClaims] = useState<Claim[]>([]);
+  const [loadingClaims, setLoadingClaims] = useState(false);
+  const [processing, setProcessing] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -46,6 +70,53 @@ export default function MyBounties() {
       setBounties([]);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function viewClaims(bounty: Bounty, e: React.MouseEvent) {
+    e.stopPropagation();
+    if (bounty.claimCount === 0) return;
+
+    setSelectedBounty(bounty);
+    setLoadingClaims(true);
+    try {
+      const result = await api.bounties.getClaims(bounty.id);
+      setClaims(result.claims || []);
+    } catch (error) {
+      console.error('Failed to load claims:', error);
+      setClaims([]);
+    } finally {
+      setLoadingClaims(false);
+    }
+  }
+
+  async function handleVerifyClaim(claim: Claim, confirmed: boolean) {
+    if (!selectedBounty) return;
+
+    const action = confirmed ? 'approve and send payment' : 'reject';
+    if (!confirm(`Are you sure you want to ${action} for this claim?`)) return;
+
+    setProcessing(true);
+    try {
+      const result = await api.bounties.verify(selectedBounty.id, {
+        claimId: claim.id,
+        confirmed,
+        rating: confirmed ? 5 : undefined,
+        review: confirmed ? 'Thank you!' : 'Does not match requirements'
+      });
+
+      if (result.ok) {
+        alert(confirmed
+          ? '✅ Payment sent! The bounty is now completed.'
+          : '❌ Claim rejected.');
+        setSelectedBounty(null);
+        setClaims([]);
+        loadMyBounties(); // Refresh bounties
+      }
+    } catch (error: any) {
+      alert('Failed to process claim: ' + error.message);
+    } finally {
+      setProcessing(false);
     }
   }
 
@@ -152,6 +223,41 @@ export default function MyBounties() {
     borderRadius: 'var(--radius-md)',
     fontSize: 'var(--text-small)',
     fontWeight: 'var(--font-bold)',
+    cursor: 'pointer',
+  };
+
+  const modalOverlayStyles: CSSProperties = {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'rgba(0, 0, 0, 0.7)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+    padding: 'var(--space-4)',
+  };
+
+  const modalContentStyles: CSSProperties = {
+    background: 'var(--color-surface)',
+    borderRadius: 'var(--radius-lg)',
+    padding: 'var(--space-6)',
+    maxWidth: '800px',
+    width: '100%',
+    maxHeight: '90vh',
+    overflowY: 'auto',
+    border: '2px solid var(--color-border)',
+    boxShadow: 'var(--shadow-s3)',
+  };
+
+  const claimCardStyles: CSSProperties = {
+    background: 'var(--color-bg)',
+    borderRadius: 'var(--radius-md)',
+    padding: 'var(--space-4)',
+    marginBottom: 'var(--space-4)',
+    border: '2px solid var(--color-border)',
   };
 
   return (
@@ -200,7 +306,7 @@ export default function MyBounties() {
             <div
               key={bounty.id}
               style={bountyCardStyles}
-              onClick={() => navigate(`/bounty/${bounty.id}`)}
+              onClick={() => bounty.claimCount > 0 ? null : navigate(`/bounty/${bounty.id}`)}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = 'translateY(-2px)';
                 e.currentTarget.style.borderColor = 'var(--color-brand)';
@@ -236,10 +342,13 @@ export default function MyBounties() {
                   </div>
                 </div>
 
-                {/* Notification Badge */}
+                {/* Notification Badge - Clickable to view claims */}
                 {bounty.claimCount > 0 && (
-                  <div style={notificationBadgeStyles}>
-                    🔔 {bounty.claimCount} {bounty.claimCount === 1 ? 'Claim' : 'Claims'}
+                  <div
+                    style={notificationBadgeStyles}
+                    onClick={(e) => viewClaims(bounty, e)}
+                  >
+                    🔔 {bounty.claimCount} {bounty.claimCount === 1 ? 'Claim' : 'Claims'} - Click to Review
                   </div>
                 )}
               </div>
@@ -291,6 +400,110 @@ export default function MyBounties() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Claims Modal */}
+      {selectedBounty && (
+        <div style={modalOverlayStyles} onClick={() => setSelectedBounty(null)}>
+          <div style={modalContentStyles} onClick={(e) => e.stopPropagation()}>
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <h2 style={{ fontSize: 'var(--text-h2)', fontWeight: 'var(--font-bold)', marginBottom: 'var(--space-2)' }}>
+                Claims for: {selectedBounty.bountyType === 'treasure_hunt' ? selectedBounty.treasureHunt?.title : selectedBounty.lostItem?.title}
+              </h2>
+              <p style={{ color: 'var(--color-text-2)' }}>
+                Review and approve claims to send instant payment via Visa Direct
+              </p>
+            </div>
+
+            {loadingClaims ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: 'var(--space-10)' }}>
+                <LoadingSpinner />
+              </div>
+            ) : claims.length === 0 ? (
+              <p style={{ textAlign: 'center', padding: 'var(--space-6)', color: 'var(--color-text-2)' }}>
+                No claims yet
+              </p>
+            ) : (
+              claims.map(claim => (
+                <div key={claim.id} style={claimCardStyles}>
+                  {/* Claimer Info */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
+                    <span style={{ fontSize: '24px' }}>{claim.claimer?.avatar || '😊'}</span>
+                    <div>
+                      <div style={{ fontWeight: 'var(--font-bold)' }}>{claim.claimer?.username || 'Unknown'}</div>
+                      <div style={{ fontSize: 'var(--text-small)', color: 'var(--color-text-2)' }}>
+                        Level {claim.claimer?.level || 1} • {new Date(claim.createdAt).toLocaleString()}
+                      </div>
+                    </div>
+                    <div style={{
+                      marginLeft: 'auto',
+                      padding: 'var(--space-1) var(--space-2)',
+                      borderRadius: 'var(--radius-pill)',
+                      fontSize: 'var(--text-xs)',
+                      fontWeight: 'var(--font-bold)',
+                      background: claim.status === 'verified' ? 'var(--color-accent-green)20' : 'var(--color-accent-yellow)20',
+                      color: claim.status === 'verified' ? 'var(--color-accent-green)' : 'var(--color-accent-yellow)',
+                    }}>
+                      {claim.status.toUpperCase()}
+                    </div>
+                  </div>
+
+                  {/* Proof Details */}
+                  <div style={{ marginBottom: 'var(--space-3)' }}>
+                    <div style={{ fontWeight: 'var(--font-semibold)', marginBottom: 'var(--space-1)' }}>📝 Description:</div>
+                    <p style={{ color: 'var(--color-text-2)', marginBottom: 'var(--space-2)' }}>
+                      {claim.proofOfPossession.description}
+                    </p>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)', fontSize: 'var(--text-small)' }}>
+                      <div>
+                        <strong>📍 Location:</strong> {claim.proofOfPossession.location}
+                      </div>
+                      <div>
+                        <strong>📅 Found:</strong> {new Date(claim.proofOfPossession.foundDate).toLocaleString()}
+                      </div>
+                    </div>
+
+                    {claim.proofOfPossession.images && claim.proofOfPossession.images.length > 0 && (
+                      <div style={{ marginTop: 'var(--space-2)' }}>
+                        <strong>📸 Images:</strong> {claim.proofOfPossession.images.length} attached
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Action Buttons */}
+                  {claim.status === 'pending' && (
+                    <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
+                      <Button
+                        onClick={() => handleVerifyClaim(claim, true)}
+                        variant="primary"
+                        disabled={processing}
+                        style={{ flex: 1 }}
+                      >
+                        {processing ? 'Processing...' : `✅ Approve & Send $${selectedBounty.monetaryReward?.amount}`}
+                      </Button>
+                      <Button
+                        onClick={() => handleVerifyClaim(claim, false)}
+                        variant="secondary"
+                        disabled={processing}
+                        style={{ flex: 1 }}
+                      >
+                        ❌ Reject
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+
+            {/* Close Button */}
+            <div style={{ marginTop: 'var(--space-4)', textAlign: 'center' }}>
+              <Button onClick={() => setSelectedBounty(null)} variant="secondary">
+                Close
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>

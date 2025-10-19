@@ -418,6 +418,15 @@ export const api = {
         });
       });
     },
+
+    getClaims(bountyId: string) {
+      return withAuth((headers) => {
+        return fetchJSON(`${DATA_BASE_URL}/api/bounties/${bountyId}/claims`, {
+          method: 'GET',
+          headers,
+        });
+      });
+    },
   },
 
   treasureHunts: {

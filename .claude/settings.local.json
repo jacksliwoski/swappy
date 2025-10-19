@@ -37,7 +37,8 @@
       "Bash(timeout /t 2 /nobreak)",
       "Bash(findstr :5173)",
       "Bash(cat bounties.json)",
-      "Bash(taskkill //PID 29608 //F)"
+      "Bash(taskkill //PID 29608 //F)",
+      "Bash(taskkill //PID 27480 //F)"
     ],
     "deny": [],
     "ask": []

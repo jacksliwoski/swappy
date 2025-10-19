@@ -139,6 +139,52 @@ router.get('/my', requireAuth, async (req, res) => {
   }
 });
 
+// GET /api/bounties/:id/claims - Get claims for a specific bounty
+router.get('/:id/claims', requireAuth, async (req, res) => {
+  try {
+    const { id: bountyId } = req.params;
+    const currentUser = req.user;
+
+    // Get bounty
+    const bountiesDb = await readJson(bountiesFile);
+    const bounty = bountiesDb.bounties[bountyId] || bountiesDb.byId[bountyId] || bountiesDb.demo[bountyId];
+
+    if (!bounty) {
+      return res.status(404).json({ ok: false, error: 'Bounty not found' });
+    }
+
+    // Only bounty owner can see claims
+    if (bounty.userId !== currentUser.id) {
+      return res.status(403).json({ ok: false, error: 'Only bounty creator can view claims' });
+    }
+
+    // Get claims
+    const claimsDb = await readJson(claimsFile);
+    const claimIds = claimsDb.byBounty[bountyId] || [];
+    let claims = claimIds.map(id => claimsDb.claims[id] || claimsDb.byId[id]).filter(Boolean);
+
+    // Enrich claims with claimer user data
+    for (const claim of claims) {
+      const claimer = await findUserById(claim.claimerId);
+      if (claimer) {
+        claim.claimer = {
+          id: claimer.id,
+          username: claimer.username,
+          avatar: claimer.avatar || '😊',
+          level: claimer.level || 1
+        };
+      }
+    }
+
+    console.log('[Bounties API] Found', claims.length, 'claims for bounty:', bountyId);
+
+    res.json({ ok: true, claims });
+  } catch (error) {
+    console.error('[Bounties API] Error fetching claims:', error);
+    res.status(500).json({ ok: false, error: 'Failed to fetch claims' });
+  }
+});
+
 // GET /api/bounties/:id - Get specific bounty
 router.get('/:id', requireAuth, async (req, res) => {
   try {
