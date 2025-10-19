@@ -183,13 +183,13 @@ export default function TradeBuilder() {
         return item?.valuation.estimate.mid || 0;
       });
 
-      // Skip AI fairness check for giveaways (one side empty)
+      // Show caution for one-sided trades (giveaways/requests)
       if (myOffer.length === 0 || theirOffer.length === 0) {
         const totalA = myValues.reduce((sum, v) => sum + v, 0);
         const totalB = theirValues.reduce((sum, v) => sum + v, 0);
         setFairness({
-          fairness: 1.0,
-          warn: false,
+          fairness: 0,
+          warn: true,
           A: totalA,
           B: totalB,
           diff: totalB - totalA,
@@ -670,19 +670,111 @@ export default function TradeBuilder() {
             </div>
           </div>
 
-          {/* Confirmation Checkbox */}
+          {/* AI Trade Analysis */}
+          {fairness && (myOffer.length > 0 || theirOffer.length > 0) && (
             <div
               style={{
                 padding: 'var(--space-4)',
-              background: 'var(--color-white)',
+                background: fairness.warn
+                  ? 'var(--color-rating-bad-bg)'
+                  : fairness.fairness >= 0.9
+                  ? 'var(--color-rating-great-bg)'
+                  : 'var(--color-rating-fair-bg)',
                 borderRadius: 'var(--radius-lg)',
-                boxShadow: 'var(--shadow-md)',
+                border: `2px solid ${
+                  fairness.warn
+                    ? 'var(--color-rating-bad)'
+                    : fairness.fairness >= 0.9
+                    ? 'var(--color-rating-great)'
+                    : 'var(--color-rating-fair)'
+                }`,
               }}
             >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
+                <span style={{ fontSize: '24px' }}>
+                  {fairness.warn ? '⚠️' : fairness.fairness >= 0.9 ? '✨' : '⚖️'}
+                </span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-bold)', color: 'var(--color-text-1)' }}>
+                    AI Trade Analysis
+                  </div>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-2)' }}>
+                    Powered by Gemini
+                  </div>
+                </div>
+                <div
+                  style={{
+                    fontSize: 'var(--text-lg)',
+                    fontWeight: 'var(--font-bold)',
+                    color: fairness.warn
+                      ? 'var(--color-rating-bad)'
+                      : fairness.fairness >= 0.9
+                      ? 'var(--color-rating-great)'
+                      : 'var(--color-rating-fair)',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  {fairness.warn ? 'Uneven' : fairness.fairness >= 0.9 ? 'Great' : 'Fair'}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', color: 'var(--color-text-2)', marginBottom: 'var(--space-2)' }}>
+                <span>Your items: ${fairness.A.toFixed(0)}</span>
+                <span>Their items: ${fairness.B.toFixed(0)}</span>
+              </div>
+
+              <div style={{
+                height: '8px',
+                background: 'var(--color-gray-200)',
+                borderRadius: 'var(--radius-full)',
+                overflow: 'hidden',
+              }}>
+                <div style={{
+                  height: '100%',
+                  width: `${fairness.fairness * 100}%`,
+                  background: fairness.warn
+                    ? 'var(--color-rating-bad)'
+                    : fairness.fairness >= 0.9
+                    ? 'var(--color-rating-great)'
+                    : 'var(--color-rating-fair)',
+                  transition: 'width 0.3s ease',
+                }} />
+              </div>
+
+              {fairness.warn && (
+                <div style={{
+                  marginTop: 'var(--space-3)',
+                  fontSize: 'var(--text-sm)',
+                  color: 'var(--color-rating-bad)',
+                  fontWeight: 'var(--font-medium)',
+                }}>
+                  {myOffer.length === 0 || theirOffer.length === 0 ? (
+                    <>
+                      ⚠️ {myOffer.length === 0 
+                        ? 'Caution - You are receiving items but offering nothing in return' 
+                        : 'Caution - You are giving items but receiving nothing in return'}
+                    </>
+                  ) : (
+                    <>💡 This trade appears uneven. The values differ by ${Math.abs(fairness.diff).toFixed(0)}.</>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Confirmation Checkbox */}
+          <div
+            style={{
+              padding: 'var(--space-4)',
+              background: 'var(--color-white)',
+              borderRadius: 'var(--radius-lg)',
+              boxShadow: 'var(--shadow-md)',
+            }}
+          >
             <label
               style={{
-              display: 'flex',
-              alignItems: 'center',
+                display: 'flex',
+                alignItems: 'center',
                 gap: 'var(--space-3)',
                 cursor: 'pointer',
                 fontSize: 'var(--text-base)',
@@ -702,7 +794,7 @@ export default function TradeBuilder() {
                 I confirm this trade offer
               </span>
             </label>
-            </div>
+          </div>
 
           {/* Make Offer Button */}
               <Button
@@ -877,6 +969,99 @@ export default function TradeBuilder() {
             )}
           </div>
         </div>
+
+        {/* AI Trade Analysis (Mobile) */}
+        {fairness && (myOffer.length > 0 || theirOffer.length > 0) && (
+          <div
+            style={{
+              margin: 'var(--space-4) 0',
+              padding: 'var(--space-3)',
+              background: fairness.warn
+                ? 'var(--color-rating-bad-bg)'
+                : fairness.fairness >= 0.9
+                ? 'var(--color-rating-great-bg)'
+                : 'var(--color-rating-fair-bg)',
+              borderRadius: 'var(--radius-lg)',
+              border: `2px solid ${
+                fairness.warn
+                  ? 'var(--color-rating-bad)'
+                  : fairness.fairness >= 0.9
+                  ? 'var(--color-rating-great)'
+                  : 'var(--color-rating-fair)'
+              }`,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
+              <span style={{ fontSize: '20px' }}>
+                {fairness.warn ? '⚠️' : fairness.fairness >= 0.9 ? '✨' : '⚖️'}
+              </span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-bold)', color: 'var(--color-text-1)' }}>
+                  AI Trade Analysis
+                </div>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-2)' }}>
+                  Powered by Gemini
+                </div>
+              </div>
+              <div
+                style={{
+                  fontSize: 'var(--text-base)',
+                  fontWeight: 'var(--font-bold)',
+                  color: fairness.warn
+                    ? 'var(--color-rating-bad)'
+                    : fairness.fairness >= 0.9
+                    ? 'var(--color-rating-great)'
+                    : 'var(--color-rating-fair)',
+                  textTransform: 'uppercase',
+                }}
+              >
+                {fairness.warn ? 'Uneven' : fairness.fairness >= 0.9 ? 'Great' : 'Fair'}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', color: 'var(--color-text-2)', marginBottom: 'var(--space-2)' }}>
+              <span>You: ${fairness.A.toFixed(0)}</span>
+              <span>Them: ${fairness.B.toFixed(0)}</span>
+            </div>
+
+            <div style={{
+              height: '6px',
+              background: 'var(--color-gray-200)',
+              borderRadius: 'var(--radius-full)',
+              overflow: 'hidden',
+            }}>
+              <div style={{
+                height: '100%',
+                width: `${fairness.fairness * 100}%`,
+                background: fairness.warn
+                  ? 'var(--color-rating-bad)'
+                  : fairness.fairness >= 0.9
+                  ? 'var(--color-rating-great)'
+                  : 'var(--color-rating-fair)',
+                transition: 'width 0.3s ease',
+              }} />
+            </div>
+
+            {fairness.warn && (
+              <div style={{
+                marginTop: 'var(--space-2)',
+                fontSize: 'var(--text-xs)',
+                color: 'var(--color-rating-bad)',
+                fontWeight: 'var(--font-medium)',
+              }}>
+                {myOffer.length === 0 || theirOffer.length === 0 ? (
+                  <>
+                    ⚠️ {myOffer.length === 0 
+                      ? 'Caution - Receiving items, offering nothing' 
+                      : 'Caution - Giving items, receiving nothing'}
+                  </>
+                ) : (
+                  <>Uneven by ${Math.abs(fairness.diff).toFixed(0)}</>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Event Log */}
         {events.length > 0 && <EventLog events={events} />}
