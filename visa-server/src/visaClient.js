@@ -57,24 +57,27 @@ async function pav(pan, expMonth, expYear) {
   const urlPath = config.visaPavPath || '/pav/v1/cardvalidation';
 
   const body = {
-    systemsTraceAuditNumber: sixDigitTrace(),                 // recommended
-    retrievalReferenceNumber: rrn12(),                        // recommended
-    primaryAccountNumber: String(pan),
-    cardExpiryDate: {
-      month: String(expMonth).padStart(2, '0'),
-      year: String(expYear),
-    },
-    acquiringBin: process.env.VISA_ACQUIRING_BIN,            // <-- from .env
-    acquirerCountryCode: process.env.VISA_ACQUIRER_COUNTRY_CODE, // <-- from .env (e.g., "840")
-    // Minimal cardAcceptor; add more fields if your project requires
+    acquirerCountryCode: process.env.VISA_ACQUIRER_COUNTRY_CODE,
+    acquiringBin: process.env.VISA_ACQUIRING_BIN,
+    addressVerificationResults: '4',
     cardAcceptor: {
-      name: 'Swappy Demo',
-      idCode: 'SWAPPY01',
       address: {
         country: process.env.VISA_ACQUIRER_COUNTRY_CODE || '840',
+        zipCode: '98101',
       },
+      idCode: 'SWAPPY_MERCH',
+      name: 'Swappy Demo',
+      terminalId: 'SWAPPY01',
     },
+    cardCvv2Value: '111',
+    cardExpiryDate: String(expYear) + '-' + String(expMonth).padStart(2, '0'),
+    primaryAccountNumber: String(pan),
+    retrievalReferenceNumber: rrn12(),
+    systemsTraceAuditNumber: sixDigitTrace(),
   };
+
+  // Debug: log what we're sending
+  console.log('[PAV Request Body]', JSON.stringify(body, null, 2));
 
   // basic sanity so we fail clearly before calling Visa
   for (const f of ['acquiringBin', 'acquirerCountryCode']) {
