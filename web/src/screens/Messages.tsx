@@ -9,6 +9,7 @@ import MeetupAssistant, { MeetupDetails } from '../components/meetup/MeetupAssis
 import TradeOfferCard from '../components/trade/TradeOfferCard';
 import { detectMeetupIntent, detectUnsafeBehavior } from '../utils/meetupDetection';
 import type { Conversation, Message, User, ModerationResult } from '../types';
+import { useLocation } from 'react-router-dom';
 
 export default function Messages() {
   const { conversationId: paramConversationId } = useParams();
@@ -24,13 +25,31 @@ export default function Messages() {
   const [showPlanMeetupButton, setShowPlanMeetupButton] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const location = useLocation();
+  const [bountyContext, setBountyContext] = useState<{ bountyId?: string; claimId?: string } | null>(null);
+  const [isBountyOwner, setIsBountyOwner] = useState(false);
 
   useEffect(() => {
+    // parse query params to get bounty/claim context
+    const qs = new URLSearchParams(location.search);
+    const bountyId = qs.get('bountyId') || undefined;
+    const claimId = qs.get('claimId') || undefined;
+    if (bountyId && claimId) setBountyContext({ bountyId, claimId });
+    else setBountyContext(null);
+
     // Get current user first, then load conversations
     api.auth.me().then(res => {
       if (res.ok && res.user) {
         setCurrentUser(res.user);
         loadConversations(res.user.id);
+        // If we have bounty context, check ownership
+        if (bountyId) {
+          api.bounties.get(bountyId).then(bres => {
+            if (bres.ok && bres.bounty) {
+              setIsBountyOwner(bres.bounty.userId === res.user.id);
+            }
+          }).catch(() => {});
+        }
       }
     }).catch(err => {
       console.error('Failed to get current user:', err);
@@ -235,6 +254,27 @@ export default function Messages() {
 
   function scrollToBottom() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  async function handleReleaseFunds() {
+    if (!bountyContext || !bountyContext.bountyId || !bountyContext.claimId) return;
+    if (!confirm('Release bounty funds to claimer? This will trigger the mock Visa Direct payout.')) return;
+    try {
+      const res = await api.bounties.payoutClaim(bountyContext.bountyId, bountyContext.claimId);
+      if (res.ok) {
+        alert('✅ Payout initiated: ' + (res.payout?.transactionId || 'mock_tx'));
+        // reload messages / claims as needed
+        if (currentUser) {
+          await loadConversations(currentUser.id);
+          if (selectedConvId) await loadMessages(selectedConvId);
+        }
+      } else {
+        alert('Failed to payout: ' + (res.error || 'unknown'));
+      }
+    } catch (err: any) {
+      console.error('Payout error:', err);
+      alert('Payout failed: ' + (err.message || err));
+    }
   }
 
   function insertMeetupLink() {
@@ -556,6 +596,11 @@ export default function Messages() {
               <Button variant="secondary" size="sm" onClick={insertTime}>
                 🕐 Share Time
               </Button>
+              {isBountyOwner && bountyContext && (
+                <Button variant="primary" size="sm" onClick={handleReleaseFunds}>
+                  💸 Release Funds
+                </Button>
+              )}
             </div>
 
             {/* Input */}

@@ -437,6 +437,15 @@ export const api = {
         });
       });
     },
+    payoutClaim(bountyId: string, claimId: string) {
+      return withAuth((headers) => {
+        return fetchJSON(`${DATA_BASE_URL}/api/bounties/${bountyId}/payout-claim`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ claimId })
+        });
+      });
+    },
     deleteClaim(bountyId: string, claimId: string) {
       return withAuth((headers) => {
         return fetchJSON(`${DATA_BASE_URL}/api/bounties/${bountyId}/claims/${claimId}`, {

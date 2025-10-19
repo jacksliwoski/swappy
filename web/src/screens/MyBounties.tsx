@@ -131,8 +131,9 @@ export default function MyBounties() {
       const ensure = await api.messages.ensureConversation(myId, claim.claimer.id);
       const convId = ensure.conversationId || ensure.id || ensure.convId;
       if (convId) {
-        // Navigate to messages screen for that conversation
-        navigate(`/messages/${convId}`);
+        // Navigate to messages screen for that conversation and include bounty/claim context
+        const qs = new URLSearchParams({ bountyId: selectedBounty.id, claimId: claim.id });
+        navigate(`/messages/${convId}?${qs.toString()}`);
       } else {
         console.warn('No conversation id returned from ensureConversation', ensure);
       }

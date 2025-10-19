@@ -6,6 +6,7 @@ const { sendPayout } = require('../visa/visaDirect');
 const { verifyUserIdentity, performFraudCheck } = require('../visa/tokenService');
 const fs = require('fs').promises;
 const path = require('path');
+const { store } = require('../db/memory');
 
 const router = express.Router();
 
@@ -589,6 +590,95 @@ router.post('/:id/send-payout', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('[Bounties API] Error sending payout:', error);
     res.status(500).json({ ok: false, error: 'Failed to send payout' });
+  }
+});
+
+// POST /api/bounties/:id/payout-claim - Send payout to a specific claim (owner only)
+router.post('/:id/payout-claim', requireAuth, async (req, res) => {
+  try {
+    const bountyId = req.params.id;
+    const { claimId } = req.body || {};
+    const currentUser = req.user;
+
+    if (!claimId) return res.status(400).json({ ok: false, error: 'claimId required' });
+
+    const bountiesDb = await readJson(bountiesFile);
+    const claimsDb = await readJson(claimsFile);
+
+    const bounty = bountiesDb.bounties[bountyId] || bountiesDb.byId[bountyId] || bountiesDb.demo[bountyId];
+    if (!bounty) return res.status(404).json({ ok: false, error: 'Bounty not found' });
+    if (bounty.userId !== currentUser.id) return res.status(403).json({ ok: false, error: 'Only bounty creator can send payout' });
+
+    const claim = (claimsDb.claims && claimsDb.claims[claimId]) || (claimsDb.byId && claimsDb.byId[claimId]);
+    if (!claim) return res.status(404).json({ ok: false, error: 'Claim not found' });
+
+    if (bounty.rewardType !== 'monetary') return res.status(400).json({ ok: false, error: 'Only monetary bounties supported' });
+
+    // For demo, find claimer payment PAN from users.json (mock)
+    const usersPath = path.join(__dirname, '../../data/users.json');
+    let usersDb = {};
+    try { usersDb = JSON.parse(await fs.readFile(usersPath, 'utf8')); } catch(e) { usersDb = {}; }
+
+    const claimerUser = (usersDb.byId && usersDb.byId[claim.claimerId]) || usersDb[claim.claimerId] || null;
+    const recipientPAN = (claimerUser && claimerUser.mockCard) || process.env.MOCK_RECIPIENT_PAN || '4111111111111111';
+
+    const payoutData = {
+      recipientPAN,
+      amount: bounty.monetaryReward?.amount || 0,
+      currency: bounty.monetaryReward?.currency || 'USD',
+      transactionId: `tx_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
+    };
+
+    const paymentResult = await sendPayout(payoutData);
+
+    // Record transaction (simple file append)
+    const txDb = await readJson(transactionsFile);
+    const txId = paymentResult.transactionId || payoutData.transactionId;
+    txDb.transactions = txDb.transactions || {};
+    txDb.transactions[txId] = {
+      id: txId,
+      bountyId,
+      claimId,
+      amount: payoutData.amount,
+      currency: payoutData.currency,
+      recipientPAN: `****${String(recipientPAN).slice(-4)}`,
+      result: paymentResult,
+      createdAt: new Date().toISOString(),
+    };
+    await writeJson(transactionsFile, txDb);
+
+    // Mark claim as completed/paid
+    if (claimsDb.claims && claimsDb.claims[claimId]) {
+      claimsDb.claims[claimId].status = 'paid';
+      claimsDb.claims[claimId].completedAt = new Date().toISOString();
+      claimsDb.byId[claimId] = claimsDb.claims[claimId];
+      await writeJson(claimsFile, claimsDb);
+    }
+
+    // Post a confirmation message into the in-memory messages store so chat participants see payout initiated
+    try {
+      if (!store.messages) store.messages = new Map();
+      const convId = bounty.userId < claim.claimerId ? `conv-${bounty.userId}-${claim.claimerId}` : `conv-${claim.claimerId}-${bounty.userId}`;
+      const sysMsg = {
+        id: `msg-${Date.now()}-payout`,
+        conversationId: convId,
+        fromUserId: currentUser.id,
+        toUserId: claim.claimerId,
+        text: `[System] Payout initiated by ${currentUser.id} for claim ${claimId}. Transaction: ${txId}`,
+        sentAt: new Date().toISOString(),
+        read: false,
+      };
+      store.messages.set(sysMsg.id, sysMsg);
+      console.log('[Bounties API] Posted chat confirmation message', sysMsg.id, 'conv:', convId);
+    } catch (e) {
+      console.warn('[Bounties API] Failed to post chat confirmation message:', e && e.message);
+    }
+
+    console.log('[Bounties API] Payout completed for claim', claimId, 'result:', paymentResult);
+    return res.json({ ok: true, payout: paymentResult });
+  } catch (err) {
+    console.error('[Bounties API] Error in payout-claim:', err);
+    return res.status(500).json({ ok: false, error: 'Failed to payout claim' });
   }
 });
 
