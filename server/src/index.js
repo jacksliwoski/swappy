@@ -1,23 +1,24 @@
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import morgan from 'morgan';
-import { config } from './config.js';
-import { guardian } from './routes/guardian.js';
-import { users } from './routes/users.js';
-import { merchants } from './routes/merchants.js';
-import { listings } from './routes/listings.js';
+const express = require('express');
+const cors = require('cors');
+const { config } = require('./config');
 
 const app = express();
-app.use(helmet());
-app.use(express.json({limit:'1mb'}));
 app.use(cors({ origin: config.corsOrigin }));
-app.use(morgan('dev'));
+app.use(express.json());
 
-app.get('/api/health', (req,res)=>res.json({ok:true,time:new Date().toISOString(),mock:config.mock}));
-app.use('/api/guardian', guardian);
-app.use('/api/users', users);
-app.use('/api/merchants', merchants);
-app.use('/api', listings);
+// health
+app.get('/health', (_req, res) => res.json({ ok: true, mock: config.mock }));
 
-app.listen(config.port, ()=>console.log(`[swappy-visa] http://localhost:${config.port} (mock=${config.mock})`));
+// routes
+app.use('/api/listings', require('./routes/listings'));
+app.use('/api/trades', require('./routes/trades'));
+app.use('/api/users', require('./routes/users'));
+app.use('/api/merchants', require('./routes/merchants'));
+app.use('/api/guardian', require('./routes/guardian'));
+
+// 404
+app.use((_req, res) => res.status(404).json({ ok: false, error: 'not_found' }));
+
+app.listen(config.port, () => {
+  console.log(`[swappy] listening on http://localhost:${config.port} (MOCK=${config.mock})`);
+});
