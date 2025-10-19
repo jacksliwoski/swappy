@@ -104,6 +104,15 @@ router.post('/', (req, res) => {
     read: false,
   };
 
+  // Save message to store
+  if (!store.messages) {
+    store.messages = new Map();
+  }
+  store.messages.set(message.id, message);
+
+  console.log('[Messages API] Saved text message:', message.id);
+  console.log('[Messages API] Total messages in store:', store.messages.size);
+
   res.json({ ok: true, message });
 });
 

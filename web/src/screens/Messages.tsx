@@ -140,50 +140,58 @@ export default function Messages() {
     setModerationWarning(null);
 
     try {
-      // Check moderation first
-      const response = await ai.moderateStream(newMessage);
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let fullResult = '';
+      // AI Moderation is temporarily disabled
+      // Uncomment below to re-enable when AI server is available
+      
+      /* 
+      try {
+        const response = await ai.moderateStream(newMessage);
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        let fullResult = '';
 
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n');
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              fullResult += line.slice(6);
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n');
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                fullResult += line.slice(6);
+              }
             }
           }
-        }
 
-        const moderationResult: ModerationResult = JSON.parse(fullResult);
-        
-        if (moderationResult.action === 'block') {
-          setModerationWarning(moderationResult);
-          setSending(false);
-          return;
-        }
+          const moderationResult: ModerationResult = JSON.parse(fullResult);
+          
+          if (moderationResult.action === 'block') {
+            setModerationWarning(moderationResult);
+            setSending(false);
+            return;
+          }
 
-        if (moderationResult.action === 'warn') {
-          setModerationWarning(moderationResult);
+          if (moderationResult.action === 'warn') {
+            setModerationWarning(moderationResult);
+          }
         }
+      } catch (moderationError) {
+        console.warn('Moderation check failed, proceeding with message send:', moderationError);
       }
+      */
 
       // Send message
       const conv = conversations.find(c => c.id === selectedConvId);
-      const otherUser = conv?.participants.find(p => p.id !== 'user-1');
+      const otherUser = conv?.participants.find(p => p.id !== currentUser?.id);
       
-      if (otherUser) {
-        await api.messages.send(selectedConvId, 'user-1', otherUser.id, newMessage);
+      if (otherUser && currentUser) {
+        await api.messages.send(selectedConvId, currentUser.id, otherUser.id, newMessage);
         
         // Add to local state
         const newMsg: Message = {
           id: Date.now().toString(),
           conversationId: selectedConvId,
-          fromUserId: 'user-1',
+          fromUserId: currentUser.id,
           toUserId: otherUser.id,
           text: newMessage,
           sentAt: new Date().toISOString(),
@@ -425,14 +433,16 @@ export default function Messages() {
                       maxWidth: '70%',
                       padding: 'var(--space-3)',
                       borderRadius: 'var(--radius-lg)',
-                      background: isMe ? 'var(--color-primary)' : 'var(--color-white)',
-                      color: isMe ? 'white' : 'var(--color-gray-800)',
+                      background: isMe ? 'var(--color-brand)' : '#f3f4f6',
+                      color: isMe ? 'white' : '#1f2937',
+                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
                     }}>
-                      <div style={{ marginBottom: 'var(--space-1)' }}>{msg.text}</div>
+                      <div style={{ marginBottom: 'var(--space-1)', color: isMe ? 'white' : '#1f2937' }}>{msg.text}</div>
                       <div style={{
                         fontSize: 'var(--text-xs)',
                         opacity: 0.7,
                         textAlign: 'right',
+                        color: isMe ? 'white' : '#4b5563',
                       }}>
                         {new Date(msg.sentAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                       </div>
